@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Local development environment
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sales-intelligence-app
+    environment:
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_REGION=${GCP_REGION:-us-central1}
+      - BIGQUERY_DATASET=${BIGQUERY_DATASET:-sales_intelligence}
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+    volumes:
+      - .:/app
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    command: tail -f /dev/null  # Keep container running for development
+    networks:
+      - sales-intelligence-network
+
+  # Optional: Local BigQuery emulator (if needed)
+  # bigquery-emulator:
+  #   image: ghcr.io/goccy/bigquery-emulator:latest
+  #   ports:
+  #     - "9050:9050"
+  #     - "9060:9060"
+  #   networks:
+  #     - sales-intelligence-network
+
+networks:
+  sales-intelligence-network:
+    driver: bridge
+

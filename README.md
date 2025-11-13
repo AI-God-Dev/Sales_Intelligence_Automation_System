@@ -138,7 +138,51 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 **Client**: Anand Gohel (anand@maharaniweddings.com)  
 **Company**: MaharaniWeddings.com
 
+## Development
+
+### Setup
+
+```bash
+# Install dependencies
+make install-dev
+
+# Run tests
+make test
+
+# Format code
+make format
+
+# Run linters
+make lint
+```
+
+### Docker Development
+
+```bash
+# Build and run
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop
+docker-compose down
+```
+
+## CI/CD
+
+The project uses GitHub Actions for continuous integration:
+- Automated testing on push/PR
+- Code quality checks (linting, formatting)
+- Security scanning
+- Docker image building
+- Automated deployment to staging/production
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## License
 
-Proprietary - MaharaniWeddings.com
+MIT License - See [LICENSE](LICENSE) file for details.
 
