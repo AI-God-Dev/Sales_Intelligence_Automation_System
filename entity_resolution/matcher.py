@@ -1,0 +1,236 @@
+"""Entity resolution logic for matching emails and calls to Salesforce contacts/accounts."""
+import logging
+from typing import Optional, Dict, Any, List
+from google.cloud import bigquery
+from utils.email_normalizer import normalize_email
+from utils.phone_normalizer import normalize_phone, match_phone_numbers
+from utils.bigquery_client import BigQueryClient
+from config.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class EntityMatcher:
+    """Matches emails and phone numbers to Salesforce contacts and accounts."""
+    
+    def __init__(self, bq_client: BigQueryClient = None):
+        self.bq_client = bq_client or BigQueryClient()
+    
+    def match_email_to_contact(
+        self,
+        email: str,
+        check_manual_mappings: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Match email address to Salesforce contact.
+        
+        Args:
+            email: Email address to match
+            check_manual_mappings: Whether to check manual_mappings table
+        
+        Returns:
+            Dictionary with contact_id, account_id, match_confidence or None
+        """
+        normalized_email = normalize_email(email)
+        if not normalized_email:
+            return None
+        
+        # Check manual mappings first
+        if check_manual_mappings:
+            manual_match = self._check_manual_email_mapping(normalized_email)
+            if manual_match:
+                return {
+                    "contact_id": manual_match.get("sf_contact_id"),
+                    "account_id": manual_match.get("sf_account_id"),
+                    "match_confidence": "manual"
+                }
+        
+        # Exact match against sf_contacts
+        query = f"""
+        SELECT 
+            contact_id,
+            account_id,
+            email
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_contacts`
+        WHERE email = @email
+        LIMIT 1
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("email", "STRING", normalized_email)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        
+        if results:
+            contact = results[0]
+            return {
+                "contact_id": contact["contact_id"],
+                "account_id": contact["account_id"],
+                "match_confidence": "exact"
+            }
+        
+        return None
+    
+    def match_phone_to_contact(
+        self,
+        phone: str,
+        check_manual_mappings: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Match phone number to Salesforce contact.
+        
+        Args:
+            phone: Phone number to match
+            check_manual_mappings: Whether to check manual_mappings table
+        
+        Returns:
+            Dictionary with contact_id, account_id, match_confidence or None
+        """
+        normalized_phone = normalize_phone(phone)
+        if not normalized_phone:
+            return None
+        
+        # Check manual mappings first
+        if check_manual_mappings:
+            manual_match = self._check_manual_phone_mapping(normalized_phone)
+            if manual_match:
+                return {
+                    "contact_id": manual_match.get("sf_contact_id"),
+                    "account_id": manual_match.get("sf_account_id"),
+                    "match_confidence": "manual"
+                }
+        
+        # Try exact match first
+        query = f"""
+        SELECT 
+            contact_id,
+            account_id,
+            phone,
+            mobile_phone
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_contacts`
+        WHERE phone = @phone OR mobile_phone = @phone
+        LIMIT 1
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("phone", "STRING", normalized_phone)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        
+        if results:
+            contact = results[0]
+            return {
+                "contact_id": contact["contact_id"],
+                "account_id": contact["account_id"],
+                "match_confidence": "exact"
+            }
+        
+        # Try partial match (last 10 digits)
+        from utils.phone_normalizer import extract_last_10_digits
+        last_10 = extract_last_10_digits(phone)
+        if last_10:
+            # This would require a more complex query with string functions
+            # For now, return None if exact match fails
+            pass
+        
+        return None
+    
+    def _check_manual_email_mapping(self, email: str) -> Optional[Dict[str, Any]]:
+        """Check manual_mappings table for email."""
+        query = f"""
+        SELECT 
+            sf_contact_id,
+            sf_account_id
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.manual_mappings`
+        WHERE email_address = @email
+          AND is_active = TRUE
+        LIMIT 1
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("email", "STRING", email)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        return results[0] if results else None
+    
+    def _check_manual_phone_mapping(self, phone: str) -> Optional[Dict[str, Any]]:
+        """Check manual_mappings table for phone."""
+        query = f"""
+        SELECT 
+            sf_contact_id,
+            sf_account_id
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.manual_mappings`
+        WHERE phone_number = @phone
+          AND is_active = TRUE
+        LIMIT 1
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("phone", "STRING", phone)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        return results[0] if results else None
+    
+    def update_participant_matches(self, batch_size: int = 1000) -> Dict[str, int]:
+        """
+        Batch update gmail_participants with contact/account matches.
+        
+        Args:
+            batch_size: Number of participants to process at once
+        
+        Returns:
+            Dictionary with match statistics
+        """
+        stats = {
+            "processed": 0,
+            "matched": 0,
+            "unmatched": 0
+        }
+        
+        # Get unmatched participants
+        query = f"""
+        SELECT 
+            participant_id,
+            email_address
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.gmail_participants`
+        WHERE sf_contact_id IS NULL
+          AND email_address IS NOT NULL
+        LIMIT {batch_size}
+        """
+        
+        participants = self.bq_client.query(query)
+        
+        updates = []
+        for participant in participants:
+            stats["processed"] += 1
+            match = self.match_email_to_contact(participant["email_address"])
+            
+            if match:
+                updates.append({
+                    "participant_id": participant["participant_id"],
+                    "sf_contact_id": match["contact_id"],
+                    "sf_account_id": match["account_id"],
+                    "match_confidence": match["match_confidence"]
+                })
+                stats["matched"] += 1
+            else:
+                stats["unmatched"] += 1
+        
+        # Batch update (would need to use UPDATE statements or MERGE)
+        # For now, return stats - actual update logic would go here
+        logger.info(f"Entity resolution batch: {stats}")
+        
+        return stats
+

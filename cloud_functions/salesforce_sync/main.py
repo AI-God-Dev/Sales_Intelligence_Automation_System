@@ -1,0 +1,285 @@
+"""
+Salesforce Sync Cloud Function
+Syncs Account, Contact, Lead, Opportunity, Task, Event, EmailMessage objects
+"""
+import functions_framework
+import logging
+from datetime import datetime, timezone
+from simple_salesforce import Salesforce
+from utils.bigquery_client import BigQueryClient
+from utils.logger import setup_logger
+from config.config import settings
+
+logger = setup_logger(__name__)
+
+
+@functions_framework.http
+def salesforce_sync(request):
+    """
+    Cloud Function entry point for Salesforce sync.
+    
+    Expected request parameters:
+    - object_type: 'Account', 'Contact', 'Lead', 'Opportunity', 'Task', 'Event', 'EmailMessage'
+    - sync_type: 'full' or 'incremental'
+    """
+    try:
+        request_json = request.get_json(silent=True) or {}
+        object_type = request_json.get("object_type", "Account")
+        sync_type = request_json.get("sync_type", "incremental")
+        
+        # Initialize Salesforce connection
+        sf = Salesforce(
+            username=settings.salesforce_username,
+            password=settings.salesforce_password,
+            security_token=settings.salesforce_security_token,
+            domain=settings.salesforce_domain
+        )
+        
+        bq_client = BigQueryClient()
+        started_at = datetime.now(timezone.utc).isoformat()
+        
+        # Sync based on object type
+        rows_synced, errors = _sync_salesforce_object(
+            sf,
+            bq_client,
+            object_type,
+            sync_type
+        )
+        
+        completed_at = datetime.now(timezone.utc).isoformat()
+        status = "success" if errors == 0 else "partial" if rows_synced > 0 else "failed"
+        
+        # Log ETL run
+        bq_client.log_etl_run(
+            source_system="salesforce",
+            job_type=sync_type,
+            started_at=started_at,
+            completed_at=completed_at,
+            rows_processed=rows_synced,
+            rows_failed=errors,
+            status=status,
+            watermark=_get_last_modified_date(bq_client, object_type)
+        )
+        
+        return {
+            "status": "success",
+            "object_type": object_type,
+            "rows_synced": rows_synced,
+            "errors": errors
+        }, 200
+        
+    except Exception as e:
+        logger.error(f"Salesforce sync failed: {str(e)}", exc_info=True)
+        return {"error": str(e)}, 500
+
+
+def _sync_salesforce_object(
+    sf: Salesforce,
+    bq_client: BigQueryClient,
+    object_type: str,
+    sync_type: str
+) -> tuple[int, int]:
+    """Sync a Salesforce object to BigQuery."""
+    rows_synced = 0
+    errors = 0
+    
+    # Map object types to table names and field mappings
+    object_mappings = {
+        "Account": {
+            "table": "sf_accounts",
+            "fields": "Id, Name, Website, Industry, AnnualRevenue, OwnerId, CreatedDate, LastModifiedDate"
+        },
+        "Contact": {
+            "table": "sf_contacts",
+            "fields": "Id, AccountId, FirstName, LastName, Email, Phone, MobilePhone, Title, CreatedDate, LastModifiedDate"
+        },
+        "Lead": {
+            "table": "sf_leads",
+            "fields": "Id, FirstName, LastName, Email, Company, Phone, Title, LeadSource, Status, OwnerId, CreatedDate, LastModifiedDate"
+        },
+        "Opportunity": {
+            "table": "sf_opportunities",
+            "fields": "Id, AccountId, Name, StageName, Amount, CloseDate, Probability, OwnerId, IsClosed, IsWon, CreatedDate, LastModifiedDate"
+        },
+        "Task": {
+            "table": "sf_activities",
+            "fields": "Id, WhatId, WhoId, Subject, Description, ActivityDate, OwnerId, CreatedDate, LastModifiedDate",
+            "activity_type": "Task"
+        },
+        "Event": {
+            "table": "sf_activities",
+            "fields": "Id, WhatId, WhoId, Subject, Description, ActivityDate, OwnerId, CreatedDate, LastModifiedDate",
+            "activity_type": "Event"
+        }
+    }
+    
+    if object_type not in object_mappings:
+        raise ValueError(f"Unsupported object type: {object_type}")
+    
+    mapping = object_mappings[object_type]
+    
+    # Build SOQL query
+    query = f"SELECT {mapping['fields']} FROM {object_type}"
+    
+    # Add WHERE clause for incremental sync
+    if sync_type == "incremental":
+        last_modified = _get_last_modified_date(bq_client, object_type)
+        if last_modified:
+            query += f" WHERE LastModifiedDate > {last_modified}"
+    
+    query += " ORDER BY LastModifiedDate"
+    
+    try:
+        # Query Salesforce
+        results = sf.query_all(query)
+        
+        # Transform and insert rows
+        rows = []
+        for record in results['records']:
+            try:
+                row = _transform_record(record, object_type, mapping)
+                rows.append(row)
+            except Exception as e:
+                logger.error(f"Error transforming {object_type} record {record.get('Id')}: {e}")
+                errors += 1
+        
+        # Batch insert to BigQuery
+        if rows:
+            batch_size = 1000
+            for i in range(0, len(rows), batch_size):
+                batch = rows[i:i + batch_size]
+                try:
+                    bq_client.insert_rows(mapping["table"], batch)
+                    rows_synced += len(batch)
+                except Exception as e:
+                    logger.error(f"Error inserting batch: {e}")
+                    errors += len(batch)
+        
+        return rows_synced, errors
+        
+    except Exception as e:
+        logger.error(f"Error querying Salesforce: {e}", exc_info=True)
+        return rows_synced, errors + 1
+
+
+def _transform_record(record: dict, object_type: str, mapping: dict) -> dict:
+    """Transform Salesforce record to BigQuery row format."""
+    row = {}
+    
+    # Common transformations
+    if "Id" in record:
+        row[f"{object_type.lower()}_id"] = record["Id"]
+    
+    # Object-specific transformations
+    if object_type == "Account":
+        row.update({
+            "account_id": record["Id"],
+            "account_name": record.get("Name"),
+            "website": record.get("Website"),
+            "industry": record.get("Industry"),
+            "annual_revenue": record.get("AnnualRevenue"),
+            "owner_id": record.get("OwnerId"),
+            "created_date": _parse_sf_datetime(record.get("CreatedDate")),
+            "last_modified_date": _parse_sf_datetime(record.get("LastModifiedDate")),
+            "ingested_at": datetime.now(timezone.utc).isoformat()
+        })
+    elif object_type == "Contact":
+        row.update({
+            "contact_id": record["Id"],
+            "account_id": record.get("AccountId"),
+            "first_name": record.get("FirstName"),
+            "last_name": record.get("LastName"),
+            "email": record.get("Email", "").lower() if record.get("Email") else None,
+            "phone": record.get("Phone"),
+            "mobile_phone": record.get("MobilePhone"),
+            "title": record.get("Title"),
+            "ingested_at": datetime.now(timezone.utc).isoformat()
+        })
+    elif object_type == "Lead":
+        row.update({
+            "lead_id": record["Id"],
+            "first_name": record.get("FirstName"),
+            "last_name": record.get("LastName"),
+            "email": record.get("Email", "").lower() if record.get("Email") else None,
+            "company": record.get("Company"),
+            "phone": record.get("Phone"),
+            "title": record.get("Title"),
+            "lead_source": record.get("LeadSource"),
+            "status": record.get("Status"),
+            "owner_id": record.get("OwnerId"),
+            "created_date": _parse_sf_datetime(record.get("CreatedDate")),
+            "ingested_at": datetime.now(timezone.utc).isoformat()
+        })
+    elif object_type == "Opportunity":
+        row.update({
+            "opportunity_id": record["Id"],
+            "account_id": record.get("AccountId"),
+            "name": record.get("Name"),
+            "stage": record.get("StageName"),
+            "amount": record.get("Amount"),
+            "close_date": record.get("CloseDate"),
+            "probability": record.get("Probability"),
+            "owner_id": record.get("OwnerId"),
+            "is_closed": record.get("IsClosed"),
+            "is_won": record.get("IsWon"),
+            "ingested_at": datetime.now(timezone.utc).isoformat()
+        })
+    elif object_type in ["Task", "Event"]:
+        row.update({
+            "activity_id": record["Id"],
+            "activity_type": mapping.get("activity_type", object_type),
+            "what_id": record.get("WhatId"),
+            "who_id": record.get("WhoId"),
+            "subject": record.get("Subject"),
+            "description": record.get("Description"),
+            "activity_date": _parse_sf_datetime(record.get("ActivityDate")),
+            "owner_id": record.get("OwnerId"),
+            "ingested_at": datetime.now(timezone.utc).isoformat()
+        })
+    
+    return row
+
+
+def _parse_sf_datetime(dt_string: str) -> str:
+    """Parse Salesforce datetime string to ISO format."""
+    if not dt_string:
+        return None
+    
+    try:
+        # Salesforce returns ISO format, just ensure timezone
+        from dateutil import parser
+        dt = parser.parse(dt_string)
+        return dt.isoformat()
+    except Exception:
+        return None
+
+
+def _get_last_modified_date(bq_client: BigQueryClient, object_type: str) -> str:
+    """Get last modified date from BigQuery for incremental sync."""
+    table_map = {
+        "Account": "sf_accounts",
+        "Contact": "sf_contacts",
+        "Lead": "sf_leads",
+        "Opportunity": "sf_opportunities",
+        "Task": "sf_activities",
+        "Event": "sf_activities"
+    }
+    
+    table = table_map.get(object_type)
+    if not table:
+        return None
+    
+    query = f"""
+    SELECT MAX(last_modified_date) as last_modified
+    FROM `{bq_client.project_id}.{bq_client.dataset_id}.{table}`
+    """
+    
+    try:
+        results = bq_client.query(query)
+        if results and results[0].get("last_modified"):
+            return results[0]["last_modified"]
+    except Exception:
+        pass
+    
+    return None
+
