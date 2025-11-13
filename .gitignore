@@ -64,3 +64,10 @@ config/local_settings.py
 *.db
 *.sqlite
 
+# Credentials (never commit)
+docs/CREDENTIALS_TEMPLATE.md.filled
+*.credentials.json
+credentials.local.*
+.env.local
+.env.production
+

@@ -133,6 +133,31 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 - AI-generated email replies are contextually accurate and editable
 - HubSpot sequence enrollments succeed with 98%+ success rate
 
+## Production Requirements
+
+**⚠️ Important**: Before deploying to production, ensure you have:
+
+1. **All Required Credentials** (see [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md)):
+   - GCP project with billing enabled
+   - Salesforce API credentials
+   - Gmail OAuth credentials (for 3 mailboxes)
+   - Dialpad API key
+   - HubSpot API credentials
+   - LLM provider API key (Anthropic/OpenAI/Vertex AI)
+
+2. **Infrastructure Setup**:
+   - GCP APIs enabled
+   - Service accounts configured
+   - Secret Manager secrets created
+   - BigQuery dataset created
+
+3. **Access & Permissions**:
+   - Google Workspace admin access
+   - Salesforce admin access
+   - All users authorized for OAuth
+
+See [DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete requirements.
+
 ## Contact
 
 **Client**: Anand Gohel (anand@maharaniweddings.com)  
