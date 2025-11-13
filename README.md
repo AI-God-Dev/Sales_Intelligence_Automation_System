@@ -158,6 +158,8 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 
 See [DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete requirements.
 
+**⚠️ Important**: Adding credentials is just the first step! See [Getting Started Guide](docs/GETTING_STARTED.md) for the complete 8-step process to go from credentials to a running system.
+
 ## Contact
 
 **Client**: Anand Gohel (anand@maharaniweddings.com)  
