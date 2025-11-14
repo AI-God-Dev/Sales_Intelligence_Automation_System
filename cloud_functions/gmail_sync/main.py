@@ -12,6 +12,7 @@ from googleapiclient.discovery import build
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from utils.monitoring import publish_error_notification
+from utils.validation import validate_email, validate_sync_type, ValidationError
 from config.config import settings
 from gmail_dwd import get_gmail_service_for_user
 
@@ -33,6 +34,15 @@ def gmail_sync(request):
         mailbox_email = request_json.get("mailbox_email")
         sync_type = request_json.get("sync_type", "incremental")
         
+        # Validate inputs
+        try:
+            sync_type = validate_sync_type(sync_type)
+            if mailbox_email:
+                mailbox_email = validate_email(mailbox_email)
+        except ValidationError as e:
+            logger.warning(f"Validation error: {e}")
+            return {"error": str(e)}, 400
+        
         bq_client = BigQueryClient()
         started_at = datetime.now(timezone.utc).isoformat()
         
@@ -40,7 +50,10 @@ def gmail_sync(request):
         mailboxes_to_sync = [mailbox_email] if mailbox_email else settings.gmail_mailboxes
         
         if not mailboxes_to_sync:
-            return {"error": "No mailboxes configured or specified"}, 400
+            return {
+                "error": "No mailboxes configured or specified",
+                "message": "Please configure mailboxes in settings or provide mailbox_email parameter"
+            }, 400
         
         total_messages_synced = 0
         total_errors = 0
@@ -107,6 +120,13 @@ def gmail_sync(request):
             "mailboxes_synced": len(mailboxes_to_sync)
         }, 200
         
+    except ValidationError as e:
+        logger.warning(f"Validation error in Gmail sync: {e}")
+        return {
+            "error": "Invalid request parameters",
+            "message": str(e),
+            "status_code": 400
+        }, 400
     except Exception as e:
         logger.error(f"Gmail sync failed: {str(e)}", exc_info=True)
         publish_error_notification(
@@ -114,7 +134,11 @@ def gmail_sync(request):
             error=str(e),
             sync_type=request_json.get("sync_type", "unknown")
         )
-        return {"error": str(e)}, 500
+        return {
+            "error": "Internal server error",
+            "message": "An unexpected error occurred during Gmail sync. Please check logs for details.",
+            "status_code": 500
+        }, 500
 
 
 def _get_last_history_id(bq_client: BigQueryClient, mailbox_email: str) -> Optional[str]:

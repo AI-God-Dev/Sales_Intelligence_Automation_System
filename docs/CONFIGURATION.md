@@ -20,7 +20,8 @@ GCP_REGION=us-central1
 BIGQUERY_DATASET=sales_intelligence
 
 # Salesforce Configuration
-SALESFORCE_DOMAIN=login
+# Use "login" for production, "test" for sandbox
+SALESFORCE_DOMAIN=test
 
 # LLM Configuration
 LLM_PROVIDER=anthropic
@@ -69,6 +70,35 @@ gmail_mailboxes: list[str] = [
    echo -n "YOUR_CLIENT_SECRET" | gcloud secrets versions add gmail-oauth-client-secret --data-file=-
    ```
 
+## Salesforce Configuration
+
+### Sandbox vs Production
+
+For **Salesforce Sandbox**:
+- Set `SALESFORCE_DOMAIN=test` in environment variables
+- Username typically includes `.sandbox` suffix (e.g., `user@example.com.sandbox`)
+- Use sandbox Connected App credentials
+
+For **Salesforce Production**:
+- Set `SALESFORCE_DOMAIN=login` in environment variables
+- Use production Connected App credentials
+
+**📖 See [SALESFORCE_SANDBOX_SETUP.md](SALESFORCE_SANDBOX_SETUP.md) for complete sandbox setup guide.**
+
+## HubSpot Configuration
+
+HubSpot uses Private Apps for API access. The access token is stored in Secret Manager.
+
+**📖 See [HUBSPOT_SETUP.md](HUBSPOT_SETUP.md) for complete setup guide.**
+
+Required scopes:
+- `contacts.read` - Read contacts
+- `companies.read` - Read companies
+- `sequences.read` - Read sequences
+- `sequences.write` - Enroll contacts in sequences
+- `timeline.read` (recommended) - Read timeline events
+- `timeline.write` (recommended) - Write timeline events
+
 ## Secret Manager Secrets
 
 All secrets should be stored in Google Secret Manager. See [SECRETS_LIST.md](SECRETS_LIST.md) for complete list.
@@ -81,9 +111,9 @@ Required secrets:
 - `salesforce-username`
 - `salesforce-password`
 - `salesforce-security-token`
-- `salesforce-refresh-token`
+- `salesforce-refresh-token` (optional, if using OAuth flow)
 - `dialpad-api-key`
-- `hubspot-api-key`
+- `hubspot-api-key` (Private App access token)
 - `openai-api-key` (optional)
 - `anthropic-api-key` (optional)
 

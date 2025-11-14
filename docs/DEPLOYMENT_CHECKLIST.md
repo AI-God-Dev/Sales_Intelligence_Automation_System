@@ -56,6 +56,88 @@ Complete checklist for deploying the Sales Intelligence System to production.
 
 See [SECRETS_LIST.md](SECRETS_LIST.md) for detailed instructions.
 
+## Step 2A: Salesforce Sandbox Setup
+
+**📖 See [SALESFORCE_SANDBOX_SETUP.md](SALESFORCE_SANDBOX_SETUP.md) for complete detailed guide.**
+
+### Quick Checklist:
+- [ ] Access Salesforce sandbox org (URL: `https://test.salesforce.com` or sandbox instance)
+- [ ] Create integration user (recommended):
+  - [ ] Username: `integration@maharaniweddings.com.sandbox` (note `.sandbox` suffix)
+  - [ ] Profile: System Administrator (or custom with API access)
+  - [ ] Reset security token and save it
+- [ ] Create Connected App:
+  - [ ] Go to Setup → App Manager → New Connected App
+  - [ ] Name: `Sales Intelligence System`
+  - [ ] Enable OAuth Settings
+  - [ ] Callback URL: `https://oauth.pstmn.io/v1/callback` (or your callback URL)
+  - [ ] OAuth Scopes: `api`, `refresh_token`, `offline_access`, `id`, `profile`, `email`
+  - [ ] Save and copy Consumer Key (Client ID) and Consumer Secret
+  - [ ] Manage Connected App → Pre-authorize integration user
+- [ ] Verify API access:
+  - [ ] Integration user has "API Enabled" permission
+  - [ ] Test API connection (optional, using curl/Postman)
+- [ ] Store credentials in Secret Manager:
+  ```bash
+  export PROJECT_ID="maharani-sales-hub-11-2025"
+  echo -n "YOUR_CONSUMER_KEY" | gcloud secrets versions add salesforce-client-id --data-file=- --project="$PROJECT_ID"
+  echo -n "YOUR_CONSUMER_SECRET" | gcloud secrets versions add salesforce-client-secret --data-file=- --project="$PROJECT_ID"
+  echo -n "integration@maharaniweddings.com.sandbox" | gcloud secrets versions add salesforce-username --data-file=- --project="$PROJECT_ID"
+  echo -n "YOUR_PASSWORD" | gcloud secrets versions add salesforce-password --data-file=- --project="$PROJECT_ID"
+  echo -n "YOUR_SECURITY_TOKEN" | gcloud secrets versions add salesforce-security-token --data-file=- --project="$PROJECT_ID"
+  ```
+- [ ] Configure environment variable for sandbox:
+  - [ ] Set `SALESFORCE_DOMAIN=test` in Cloud Functions environment or `.env` file
+  - [ ] For Cloud Functions: `--set-env-vars SALESFORCE_DOMAIN=test`
+- [ ] Test Salesforce connection:
+  - [ ] Deploy/update salesforce-sync function with `SALESFORCE_DOMAIN=test`
+  - [ ] Trigger test sync: `gcloud scheduler jobs run salesforce-incremental-sync --location=us-central1`
+  - [ ] Verify logs show successful connection
+  - [ ] Verify data in BigQuery: `bq query --use_legacy_sql=false "SELECT COUNT(*) FROM \`maharani-sales-hub-11-2025.sales_intelligence.sf_accounts\`"`
+
+## Step 2B: HubSpot Private App Setup
+
+**📖 See [HUBSPOT_SETUP.md](HUBSPOT_SETUP.md) for complete detailed guide.**
+
+### Quick Checklist:
+- [ ] Access HubSpot Settings:
+  - [ ] Log in to HubSpot
+  - [ ] Go to Settings → Integrations → Private Apps
+- [ ] Create Private App:
+  - [ ] Click "Create a private app"
+  - [ ] Name: `Sales Intelligence System`
+  - [ ] Description: `Integration app for syncing sequences and contact data`
+- [ ] Configure Scopes (in Scopes tab):
+  - [ ] **Required**: `contacts.read`, `companies.read`, `sequences.read`, `sequences.write`
+  - [ ] **Recommended**: `timeline.read`, `timeline.write`
+  - [ ] Save scopes
+- [ ] Get Access Token:
+  - [ ] Click "Show token" on app details page
+  - [ ] Copy access token (format: `pat-na1-xxxxx-xxxxx-xxxxx`)
+  - [ ] **Important**: Token is only shown once - save it immediately!
+- [ ] Store token in Secret Manager:
+  ```bash
+  export PROJECT_ID="maharani-sales-hub-11-2025"
+  echo -n "pat-na1-YOUR_ACCESS_TOKEN" | gcloud secrets versions add hubspot-api-key --data-file=- --project="$PROJECT_ID"
+  ```
+- [ ] Grant service account access:
+  ```bash
+  gcloud secrets add-iam-policy-binding hubspot-api-key \
+    --member="serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor" \
+    --project="$PROJECT_ID"
+  ```
+- [ ] Test HubSpot API access (optional):
+  ```bash
+  curl https://api.hubapi.com/sequences/v3/sequences \
+    -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+  ```
+- [ ] Test HubSpot sync:
+  - [ ] Deploy hubspot-sync function (if not already deployed)
+  - [ ] Trigger test sync: `gcloud scheduler jobs run hubspot-sync --location=us-central1`
+  - [ ] Verify logs show successful sync
+  - [ ] Verify sequences in BigQuery: `bq query --use_legacy_sql=false "SELECT COUNT(*) FROM \`maharani-sales-hub-11-2025.sales_intelligence.hubspot_sequences\`"`
+
 ## Step 3: Configure Gmail Domain-Wide Delegation
 
 - [ ] Create OAuth 2.0 credentials in Google Cloud Console

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from simple_salesforce import Salesforce
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
+from utils.validation import validate_sync_type, validate_object_type, ValidationError
 from config.config import settings
 
 logger = setup_logger(__name__)
@@ -26,6 +27,15 @@ def salesforce_sync(request):
         request_json = request.get_json(silent=True) or {}
         object_type = request_json.get("object_type", "Account")
         sync_type = request_json.get("sync_type", "incremental")
+        
+        # Validate inputs
+        try:
+            sync_type = validate_sync_type(sync_type)
+            allowed_objects = ["Account", "Contact", "Lead", "Opportunity", "Task", "Event", "EmailMessage"]
+            object_type = validate_object_type(object_type, allowed_objects)
+        except ValidationError as e:
+            logger.warning(f"Validation error: {e}")
+            return {"error": str(e)}, 400
         
         # Initialize Salesforce connection
         sf = Salesforce(
@@ -68,9 +78,20 @@ def salesforce_sync(request):
             "errors": errors
         }, 200
         
+    except ValidationError as e:
+        logger.warning(f"Validation error in Salesforce sync: {e}")
+        return {
+            "error": "Invalid request parameters",
+            "message": str(e),
+            "status_code": 400
+        }, 400
     except Exception as e:
         logger.error(f"Salesforce sync failed: {str(e)}", exc_info=True)
-        return {"error": str(e)}, 500
+        return {
+            "error": "Internal server error",
+            "message": "An unexpected error occurred during Salesforce sync. Please check logs for details.",
+            "status_code": 500
+        }, 500
 
 
 def _sync_salesforce_object(
