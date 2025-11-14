@@ -78,10 +78,10 @@ timeline.write
 
 1. After saving, you'll be taken to the app details page
 2. Click the **"Show token"** button next to "Access token"
-3. **Copy the access token** - it will look like: `pat-na1-xxxxx-xxxxx-xxxxx`
+3. **Copy the access token** - it will look like: `pat-[region]-[random-string]` (e.g., `pat-na1-abc123-def456-ghi789`)
    - **Important**: This token is only shown once. Save it immediately!
    - Format: `pat-[region]-[random-string]`
-   - Example: `pat-na1-12345678-90ab-cdef-1234-567890abcdef`
+   - Example: `pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` (replace x's with actual token)
 
 4. **Store this token securely** - you'll need it for Secret Manager
 
@@ -110,12 +110,11 @@ Store the HubSpot access token in Google Secret Manager:
 export PROJECT_ID="maharani-sales-hub-11-2025"
 
 # Store HubSpot access token
-echo -n "pat-na1-YOUR_ACCESS_TOKEN" | gcloud secrets versions add hubspot-api-key --data-file=- --project="$PROJECT_ID"
+echo -n "YOUR_ACCESS_TOKEN" | gcloud secrets versions add hubspot-api-key --data-file=- --project="$PROJECT_ID"
 ```
 
 **Important Notes**:
-- Replace `pat-na1-YOUR_ACCESS_TOKEN` with your actual access token
-- The token includes the `pat-na1-` prefix
+- Replace `YOUR_ACCESS_TOKEN` with your actual access token (including the `pat-[region]-` prefix)
 - Never commit the token to version control
 
 ## Step 7: Grant Service Account Access
@@ -202,7 +201,7 @@ If you want to test the sequence enrollment feature:
 ### Common Issues
 
 1. **"401 Unauthorized"**:
-   - Verify access token is correct (includes `pat-na1-` prefix)
+   - Verify access token is correct (includes `pat-[region]-` prefix)
    - Check token hasn't been revoked
    - Verify token is stored correctly in Secret Manager
 

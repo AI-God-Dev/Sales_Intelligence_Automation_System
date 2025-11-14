@@ -113,12 +113,12 @@ See [SECRETS_LIST.md](SECRETS_LIST.md) for detailed instructions.
   - [ ] Save scopes
 - [ ] Get Access Token:
   - [ ] Click "Show token" on app details page
-  - [ ] Copy access token (format: `pat-na1-xxxxx-xxxxx-xxxxx`)
+  - [ ] Copy access token (format: `pat-[region]-[random-string]`)
   - [ ] **Important**: Token is only shown once - save it immediately!
 - [ ] Store token in Secret Manager:
   ```bash
   export PROJECT_ID="maharani-sales-hub-11-2025"
-  echo -n "pat-na1-YOUR_ACCESS_TOKEN" | gcloud secrets versions add hubspot-api-key --data-file=- --project="$PROJECT_ID"
+  echo -n "YOUR_ACCESS_TOKEN" | gcloud secrets versions add hubspot-api-key --data-file=- --project="$PROJECT_ID"
   ```
 - [ ] Grant service account access:
   ```bash
