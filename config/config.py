@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment and Secret Manager."""
     
     # GCP Configuration
-    gcp_project_id: str = os.getenv("GCP_PROJECT_ID", "")
+    gcp_project_id: str = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
     gcp_region: str = os.getenv("GCP_REGION", "us-central1")
     bigquery_dataset: str = os.getenv("BIGQUERY_DATASET", "sales_intelligence")
     

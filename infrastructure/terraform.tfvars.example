@@ -1,0 +1,8 @@
+# Terraform Variables for Sales Intelligence System
+# Copy this file to terraform.tfvars and update values as needed
+
+project_id  = "maharani-sales-hub-11-2025"
+region      = "us-central1"
+environment = "prod"
+dataset_id  = "sales_intelligence"
+

@@ -67,7 +67,15 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 └── scripts/                  # Utility scripts
 ```
 
-## Setup Instructions
+## Quick Start
+
+### Project Configuration
+- **GCP Project**: `maharani-sales-hub-11-2025`
+- **Service Account**: `sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com`
+- **Region**: `us-central1`
+- **BigQuery Dataset**: `sales_intelligence`
+
+### Setup Instructions
 
 1. **Prerequisites**
    - Google Cloud Platform account with billing enabled
@@ -80,33 +88,56 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
    pip install -r requirements.txt
    ```
 
-3. **Configure Secrets**
-   - Store API keys and OAuth credentials in Google Secret Manager
-   - Update configuration files with secret references
+3. **Configure Environment**
+   ```bash
+   # Copy example environment file
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-4. **Deploy Infrastructure**
+4. **Setup Secrets**
+   ```bash
+   # Create secrets in Secret Manager
+   ./scripts/setup_secrets.sh
+   # Add secret values (see docs/SECRETS_LIST.md)
+   ```
+
+5. **Deploy Infrastructure**
    ```bash
    cd infrastructure
+   cp terraform.tfvars.example terraform.tfvars
    terraform init
    terraform plan
    terraform apply
    ```
 
-5. **Deploy Cloud Functions**
+6. **Create BigQuery Tables**
+   ```bash
+   sed "s/{project_id}/maharani-sales-hub-11-2025/g" bigquery/schemas/create_tables.sql | \
+     bq query --use_legacy_sql=false
+   ```
+
+7. **Deploy Cloud Functions**
    ```bash
    ./scripts/deploy_functions.sh
    ```
 
+See [DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete deployment guide.
+
 ## Project Phases
 
-### Phase 1: Foundation & Data Pipeline ✅ (In Progress)
+### Phase 1: Foundation & Data Pipeline ✅ (Completed - Ready for Deployment)
 - [x] Project structure setup
-- [ ] BigQuery schema creation
-- [ ] Gmail ingestion
-- [ ] Salesforce sync
-- [ ] Dialpad sync
-- [ ] HubSpot sync
-- [ ] Entity resolution
+- [x] BigQuery schema creation (with sync state tracking)
+- [x] Gmail ingestion (with domain-wide delegation)
+- [x] Salesforce sync (all objects)
+- [x] Dialpad sync (calls + transcripts)
+- [x] HubSpot sync (sequences metadata)
+- [x] Entity resolution (email & phone matching)
+- [x] Pub/Sub topics and subscriptions
+- [x] Cloud Scheduler jobs (automated ingestion)
+- [x] Error handling and monitoring
+- [x] Automated test suite
 
 ### Phase 2: Intelligence & Automation
 - [ ] Embeddings generation

@@ -34,7 +34,7 @@ resource "google_cloud_scheduler_job" "gmail_incremental_sync" {
     
     body = base64encode(jsonencode({
       sync_type = "incremental"
-      mailbox_email = "anand@maharaniweddings.com" # Will be parameterized
+      # If mailbox_email is not specified, all configured mailboxes will be synced
     }))
     
     oidc_token {
@@ -72,7 +72,7 @@ resource "google_cloud_scheduler_job" "gmail_full_sync" {
     
     body = base64encode(jsonencode({
       sync_type = "full"
-      mailbox_email = "anand@maharaniweddings.com"
+      # If mailbox_email is not specified, all configured mailboxes will be synced
     }))
     
     oidc_token {

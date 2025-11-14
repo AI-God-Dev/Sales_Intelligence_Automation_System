@@ -1,399 +1,243 @@
-# Production Deployment Checklist
+# Deployment Checklist
 
-This document outlines all the information, credentials, and configurations needed to deploy and run the Sales Intelligence & Automation System in a real-world production environment.
+Complete checklist for deploying the Sales Intelligence System to production.
 
-## 🔐 Required Credentials & API Keys
+## Pre-Deployment
 
-### 1. Google Cloud Platform (GCP)
+### Project Information
+- [x] GCP Project ID: `maharani-sales-hub-11-2025`
+- [x] Service Account: `sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com`
+- [x] Region: `us-central1`
+- [x] BigQuery Dataset: `sales_intelligence`
 
-#### Project Information
-- [ ] **GCP Project ID**: `your-project-id`
-  - Must have billing enabled
-  - Must have appropriate quotas
-  - Location: GCP Console → Project Settings
+### Prerequisites
+- [ ] GCP account with billing enabled
+- [ ] GCP SDK (`gcloud`) installed and configured
+- [ ] Terraform >= 1.0 installed
+- [ ] Python 3.11+ installed
+- [ ] Access to Google Workspace Admin Console (for Gmail DWD)
+- [ ] Access to Salesforce Admin (for API credentials)
+- [ ] Access to Dialpad Admin (for API key)
+- [ ] Access to HubSpot Admin (for Private App creation)
 
-#### Service Account Credentials
-- [ ] **Service Account JSON Key File**
-  - Required for Cloud Functions execution
-  - Must have roles: BigQuery Data Editor, Secret Manager Secret Accessor, Log Writer, Monitoring Metric Writer
-  - Location: IAM & Admin → Service Accounts → Create/Download Key
+## Step 1: Configure GCP Project
 
-#### OAuth 2.0 Credentials (for Gmail)
-- [ ] **OAuth Client ID**: `xxxxx.apps.googleusercontent.com`
-- [ ] **OAuth Client Secret**: `xxxxx`
-- [ ] **Authorized Redirect URIs**: Configured in Google Cloud Console
-- [ ] **OAuth Consent Screen**: Configured with required scopes
-  - Required scope: `https://www.googleapis.com/auth/gmail.readonly`
-  - Location: APIs & Services → Credentials → OAuth 2.0 Client IDs
+- [ ] Set GCP project: `gcloud config set project maharani-sales-hub-11-2025`
+- [ ] Enable required APIs:
+  ```bash
+  gcloud services enable cloudfunctions.googleapis.com
+  gcloud services enable cloudscheduler.googleapis.com
+  gcloud services enable secretmanager.googleapis.com
+  gcloud services enable bigquery.googleapis.com
+  gcloud services enable run.googleapis.com
+  gcloud services enable pubsub.googleapis.com
+  gcloud services enable iam.googleapis.com
+  gcloud services enable gmail.googleapis.com
+  ```
 
-#### Gmail Mailbox Access
-- [ ] **Mailbox 1 Email**: `anand@maharaniweddings.com`
-  - OAuth token/refresh token for this mailbox
-- [ ] **Mailbox 2 Email**: `[sales-rep-1]@maharaniweddings.com`
-  - OAuth token/refresh token for this mailbox
-- [ ] **Mailbox 3 Email**: `[sales-rep-2]@maharaniweddings.com`
-  - OAuth token/refresh token for this mailbox
+## Step 2: Setup Secrets in Secret Manager
 
-**Note**: Each mailbox needs to authorize the OAuth application. The system will need refresh tokens stored securely.
+- [ ] Run setup script: `./scripts/setup_secrets.sh`
+- [ ] Add Gmail OAuth credentials:
+  - [ ] `gmail-oauth-client-id`
+  - [ ] `gmail-oauth-client-secret`
+- [ ] Add Salesforce credentials:
+  - [ ] `salesforce-client-id`
+  - [ ] `salesforce-client-secret`
+  - [ ] `salesforce-username`
+  - [ ] `salesforce-password`
+  - [ ] `salesforce-security-token`
+  - [ ] `salesforce-refresh-token`
+- [ ] Add Dialpad API key: `dialpad-api-key`
+- [ ] Add HubSpot API key: `hubspot-api-key`
+- [ ] Add LLM API keys (optional):
+  - [ ] `openai-api-key`
+  - [ ] `anthropic-api-key`
 
-### 2. Salesforce
+See [SECRETS_LIST.md](SECRETS_LIST.md) for detailed instructions.
 
-#### API Credentials
-- [ ] **Username**: Salesforce login username
-- [ ] **Password**: Salesforce login password
-- [ ] **Security Token**: Salesforce security token (reset password to get new token)
-- [ ] **Domain**: `login` (production) or `test` (sandbox)
-- [ ] **Instance URL**: `https://yourinstance.salesforce.com` (optional, auto-detected)
+## Step 3: Configure Gmail Domain-Wide Delegation
 
-#### Connected App Configuration
-- [ ] **Consumer Key**: OAuth Consumer Key from Connected App
-- [ ] **Consumer Secret**: OAuth Consumer Secret from Connected App
-- [ ] **Callback URL**: Configured in Salesforce Connected App
-- [ ] **OAuth Scopes**: 
-  - `api`
-  - `refresh_token`
-  - `offline_access`
+- [ ] Create OAuth 2.0 credentials in Google Cloud Console
+- [ ] Note the Client ID
+- [ ] In Google Workspace Admin Console:
+  - [ ] Navigate to Security → API Controls → Domain-wide Delegation
+  - [ ] Click "Add new"
+  - [ ] Enter Client ID from OAuth credentials
+  - [ ] Add scopes:
+    - `https://www.googleapis.com/auth/gmail.readonly`
+    - `https://www.googleapis.com/auth/gmail.modify`
+  - [ ] Authorize
+- [ ] Verify service account can access Gmail API
 
-#### Object Permissions
-Verify the following Salesforce objects are accessible:
-- [ ] Accounts (Read)
-- [ ] Contacts (Read)
-- [ ] Leads (Read, Create)
-- [ ] Opportunities (Read)
-- [ ] Tasks (Read, Create)
-- [ ] Events (Read, Create)
-- [ ] EmailMessage (Read)
+## Step 4: Deploy Infrastructure with Terraform
 
-#### IP Whitelisting (if required)
-- [ ] **GCP Function IPs**: May need to whitelist if Salesforce has IP restrictions
-  - Check with Salesforce admin
+- [ ] Navigate to infrastructure directory: `cd infrastructure`
+- [ ] Copy terraform.tfvars.example: `cp terraform.tfvars.example terraform.tfvars`
+- [ ] Verify terraform.tfvars has correct values:
+  ```hcl
+  project_id  = "maharani-sales-hub-11-2025"
+  region      = "us-central1"
+  environment = "prod"
+  dataset_id  = "sales_intelligence"
+  ```
+- [ ] Initialize Terraform: `terraform init`
+- [ ] Review plan: `terraform plan`
+- [ ] Apply infrastructure: `terraform apply`
+- [ ] Verify outputs:
+  - [ ] BigQuery dataset created
+  - [ ] Pub/Sub topics created
+  - [ ] Cloud Scheduler jobs created
+  - [ ] Service account permissions configured
 
-### 3. Dialpad
+## Step 5: Create BigQuery Tables
 
-#### API Credentials
-- [ ] **API Key**: Dialpad API key
-  - Location: Dialpad Admin → Integrations → API
-- [ ] **API Base URL**: `https://dialpad.com/api/v2` (default)
-- [ ] **User IDs**: List of Dialpad user IDs to sync
-  - User 1: `[user-id-1]` (Anand)
-  - User 2: `[user-id-2]` (Sales Rep 1)
-  - User 3: `[user-id-3]` (Sales Rep 2)
+- [ ] Update project_id in SQL file:
+  ```bash
+  sed "s/{project_id}/maharani-sales-hub-11-2025/g" bigquery/schemas/create_tables.sql > /tmp/create_tables.sql
+  ```
+- [ ] Create tables: `bq query --use_legacy_sql=false < /tmp/create_tables.sql`
+- [ ] Verify tables created: `bq ls sales_intelligence`
+- [ ] Verify all 13 tables exist:
+  - [ ] gmail_messages
+  - [ ] gmail_participants
+  - [ ] gmail_sync_state
+  - [ ] sf_accounts
+  - [ ] sf_contacts
+  - [ ] sf_leads
+  - [ ] sf_opportunities
+  - [ ] sf_activities
+  - [ ] dialpad_calls
+  - [ ] hubspot_sequences
+  - [ ] account_recommendations
+  - [ ] etl_runs
+  - [ ] manual_mappings
 
-#### Plan Requirements
-- [ ] **API Plan**: Verify plan includes:
-  - Call logs API access
-  - Call transcripts API access (if available)
-  - AI sentiment analysis (if available)
+## Step 6: Deploy Cloud Functions
 
-### 4. HubSpot
+- [ ] Navigate to project root
+- [ ] Deploy functions: `./scripts/deploy_functions.sh`
+- [ ] Verify functions deployed:
+  ```bash
+  gcloud functions list --region=us-central1
+  ```
+- [ ] Verify each function:
+  - [ ] gmail-sync
+  - [ ] salesforce-sync
+  - [ ] dialpad-sync
+  - [ ] hubspot-sync
+  - [ ] entity-resolution
 
-#### API Credentials
-- [ ] **API Key**: HubSpot Private App API Key
-  - Location: HubSpot → Settings → Integrations → Private Apps
-- [ ] **OAuth Access Token**: (Alternative to API key)
-- [ ] **OAuth Refresh Token**: (If using OAuth)
+## Step 7: Configure Gmail Mailboxes
 
-#### Required Scopes
-- [ ] **Sequences API**: Read and write access to sequences
-- [ ] **Contacts API**: Read access to contacts
-- [ ] **Enrollment API**: Write access to enroll contacts in sequences
+- [ ] Update `config/config.py` with all 3 mailbox emails:
+  ```python
+  gmail_mailboxes: list[str] = [
+      "anand@maharaniweddings.com",
+      "email2@maharaniweddings.com",  # Add second mailbox
+      "email3@maharaniweddings.com",  # Add third mailbox
+  ]
+  ```
+- [ ] Redeploy Gmail sync function if needed
 
-### 5. LLM Provider (Choose One)
+## Step 8: Verify Cloud Scheduler Jobs
 
-#### Option A: Anthropic Claude
-- [ ] **API Key**: Anthropic API key
-  - Location: Anthropic Console → API Keys
-- [ ] **Model**: `claude-3-5-sonnet-20241022` (default)
-- [ ] **Organization ID**: (if applicable)
+- [ ] List scheduler jobs: `gcloud scheduler jobs list --location=us-central1`
+- [ ] Verify all jobs exist:
+  - [ ] gmail-incremental-sync
+  - [ ] gmail-full-sync
+  - [ ] salesforce-incremental-sync
+  - [ ] salesforce-full-sync
+  - [ ] dialpad-sync
+  - [ ] hubspot-sync
+  - [ ] entity-resolution
+- [ ] Test one job manually:
+  ```bash
+  gcloud scheduler jobs run gmail-incremental-sync --location=us-central1
+  ```
 
-#### Option B: OpenAI
-- [ ] **API Key**: OpenAI API key
-  - Location: OpenAI Platform → API Keys
-- [ ] **Organization ID**: (optional)
-- [ ] **Model**: `gpt-4` or `gpt-3.5-turbo`
-- [ ] **Embedding Model**: `text-embedding-3-small`
+## Step 9: Initial Data Load
 
-#### Option C: Google Vertex AI
-- [ ] **Service Account**: GCP Service Account with Vertex AI permissions
-- [ ] **Project ID**: Same as GCP project
-- [ ] **Region**: `us-central1` (or preferred region)
-- [ ] **Model**: Vertex AI model endpoint
-
-## 📋 Configuration Information
-
-### Environment Variables
-
-Create a `.env` file or set in deployment environment:
-
+- [ ] Trigger Gmail full sync manually or wait for scheduled run
+- [ ] Trigger Salesforce full sync manually or wait for scheduled run
+- [ ] Trigger Dialpad sync manually or wait for scheduled run
+- [ ] Trigger HubSpot sync manually or wait for scheduled run
+- [ ] Verify data in BigQuery:
 ```bash
-# GCP Configuration
-GCP_PROJECT_ID=your-project-id
-GCP_REGION=us-central1
-BIGQUERY_DATASET=sales_intelligence
+  bq query --use_legacy_sql=false \
+    "SELECT COUNT(*) as count FROM \`maharani-sales-hub-11-2025.sales_intelligence.gmail_messages\`"
+  ```
 
-# Salesforce Configuration
-SALESFORCE_DOMAIN=login  # or 'test' for sandbox
+## Step 10: Run Entity Resolution
 
-# LLM Configuration
-LLM_PROVIDER=anthropic  # or 'openai' or 'vertex_ai'
-LLM_MODEL=claude-3-5-sonnet-20241022
-EMBEDDING_MODEL=text-embedding-3-small
-
-# Gmail OAuth (for initial setup)
-GMAIL_OAUTH_CLIENT_ID=xxxxx.apps.googleusercontent.com
-GMAIL_OAUTH_CLIENT_SECRET=xxxxx
-
-# Sync Intervals
-GMAIL_SYNC_INTERVAL_MINUTES=60
-SALESFORCE_SYNC_INTERVAL_HOURS=24
-DIALPAD_SYNC_INTERVAL_HOURS=24
-
-# Data Quality Targets
-EMAIL_MATCH_TARGET_PERCENTAGE=90.0
-CALL_MATCH_TARGET_PERCENTAGE=85.0
-HUBSPOT_ENROLLMENT_SUCCESS_TARGET=98.0
-
-# Query Configuration
-MAX_QUERY_RESULTS=100
-QUERY_TIMEOUT_SECONDS=30
-
-# Data Retention
-DATA_RETENTION_YEARS=3
-```
-
-### Secret Manager Setup
-
-All sensitive credentials should be stored in Google Secret Manager:
-
+- [ ] Trigger entity resolution manually:
+  ```bash
+  gcloud scheduler jobs run entity-resolution --location=us-central1
+  ```
+- [ ] Verify matches in BigQuery:
 ```bash
-# Required Secrets (add via gcloud CLI or Console)
-gcloud secrets create salesforce-username
-gcloud secrets create salesforce-password
-gcloud secrets create salesforce-security-token
-gcloud secrets create dialpad-api-key
-gcloud secrets create hubspot-api-key
-gcloud secrets create openai-api-key
-gcloud secrets create anthropic-api-key
-```
+  bq query --use_legacy_sql=false \
+    "SELECT COUNT(*) as matched FROM \`maharani-sales-hub-11-2025.sales_intelligence.gmail_participants\` WHERE sf_contact_id IS NOT NULL"
+  ```
 
-## 🏗️ Infrastructure Requirements
+## Step 11: Monitoring Setup
 
-### GCP Services to Enable
+- [ ] Verify error notifications are working:
+  - [ ] Check Pub/Sub topic `ingestion-errors` exists
+  - [ ] Set up Cloud Monitoring alerts for error topic
+- [ ] Set up Cloud Monitoring dashboards:
+  - [ ] ETL job success/failure rates
+  - [ ] Data ingestion volumes
+  - [ ] Entity resolution match rates
+  - [ ] Function execution times
+- [ ] Configure alerting:
+  - [ ] ETL job failures
+  - [ ] High error rates
+  - [ ] Function timeouts
+  - [ ] API quota exhaustion
 
-- [ ] **Cloud Functions API**: `cloudfunctions.googleapis.com`
-- [ ] **Cloud Run API**: `run.googleapis.com`
-- [ ] **Cloud Scheduler API**: `cloudscheduler.googleapis.com`
-- [ ] **BigQuery API**: `bigquery.googleapis.com`
-- [ ] **Secret Manager API**: `secretmanager.googleapis.com`
-- [ ] **Cloud Logging API**: `logging.googleapis.com`
-- [ ] **Cloud Monitoring API**: `monitoring.googleapis.com`
-- [ ] **Cloud Storage API**: `storage.googleapis.com` (for function source)
+## Step 12: Verification & Testing
 
-### Resource Quotas
+- [ ] Check Cloud Functions logs:
+  ```bash
+  gcloud functions logs read gmail-sync --limit=50 --region=us-central1
+  ```
+- [ ] Verify ETL runs table:
+  ```bash
+  bq query --use_legacy_sql=false \
+    "SELECT * FROM \`maharani-sales-hub-11-2025.sales_intelligence.etl_runs\` ORDER BY started_at DESC LIMIT 10"
+  ```
+- [ ] Run automated tests:
+  ```bash
+  pytest tests/ -v
+  ```
+- [ ] Verify data quality:
+  - [ ] Email match percentage > 90%
+  - [ ] Call match percentage > 85%
+  - [ ] No duplicate records
+  - [ ] All timestamps are valid
 
-Verify/Request the following quotas:
-- [ ] **Cloud Functions**: 
-  - Concurrent executions: 100+ (default: 80)
-  - Function invocations per day: Sufficient for your volume
-- [ ] **BigQuery**:
-  - Query slots: 200+ (default: 200)
-  - Daily query quota: Sufficient for your queries
-  - Storage: Plan for data growth
-- [ ] **Gmail API**:
-  - Quota units per day: 1 billion (default)
-  - Requests per 100 seconds per user: 250
-- [ ] **Cloud Scheduler**:
-  - Jobs per project: 500+ (default: 500)
+## Post-Deployment
 
-### Network Configuration
+- [ ] Document any custom configurations
+- [ ] Train team on monitoring and operations
+- [ ] Set up backup procedures
+- [ ] Schedule regular data quality reviews
+- [ ] Plan for scaling if needed
 
-- [ ] **VPC**: (Optional) Configure VPC connector if needed
-- [ ] **Firewall Rules**: Allow outbound HTTPS (443) for API calls
-- [ ] **Private IP**: (Optional) Configure if using VPC
+## Troubleshooting
 
-## 👥 User Access & Permissions
+If any step fails:
+1. Check Cloud Logging for errors
+2. Verify service account permissions
+3. Check Secret Manager secrets exist
+4. Verify API quotas are not exceeded
+5. Review [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
-### Google Workspace
+## Support
 
-- [ ] **Domain**: `maharaniweddings.com`
-- [ ] **Admin Access**: For OAuth consent screen approval
-- [ ] **User Consent**: Each Gmail user must authorize the application
-
-### Salesforce Users
-
-- [ ] **Integration User**: Dedicated Salesforce user for API access
-  - Username: `integration@maharaniweddings.com`
-  - Profile: System Administrator or Custom Profile with required permissions
-- [ ] **Sales Rep Users**: Map to Salesforce User IDs for personalization
-  - User 1: `[sf-user-id-1]` → Anand
-  - User 2: `[sf-user-id-2]` → Sales Rep 1
-  - User 3: `[sf-user-id-3]` → Sales Rep 2
-
-### Application Users
-
-- [ ] **Web App Access**: List of Google Workspace emails allowed to access the web app
-  - Must be in `maharaniweddings.com` domain
-  - Configured in OAuth consent screen
-
-## 📊 Initial Data Requirements
-
-### Historical Data Sync
-
-- [ ] **Gmail Historical Sync**: 
-  - Date range: `[start-date]` to `[end-date]`
-  - Estimated message count: `[number]`
-  - Expected sync time: `[hours]`
-
-- [ ] **Salesforce Historical Sync**:
-  - Full sync of all objects (Account, Contact, Lead, Opportunity, Task, Event)
-  - Estimated record counts per object
-  - Expected sync time: `[hours]`
-
-- [ ] **Dialpad Historical Sync**:
-  - Date range: `[start-date]` to `[end-date]`
-  - Estimated call count: `[number]`
-  - Expected sync time: `[hours]`
-
-### Data Validation
-
-- [ ] **Sample Data Review**: Review sample records after initial sync
-- [ ] **Entity Resolution Validation**: Verify match accuracy with known contacts
-- [ ] **Data Quality Check**: Verify completeness and accuracy
-
-## 🔔 Monitoring & Alerting
-
-### Alert Configuration
-
-Set up alerts for:
-- [ ] **ETL Job Failures**: Alert when ETL runs fail
-- [ ] **High Error Rates**: Alert when error rate > 5%
-- [ ] **Low Match Accuracy**: Alert when match accuracy < 85%
-- [ ] **API Quota Warnings**: Alert at 80% of quota
-- [ ] **Function Timeouts**: Alert on function timeouts
-- [ ] **BigQuery Query Failures**: Alert on query errors
-- [ ] **Cost Alerts**: Alert at $500, $750, $1000 monthly spend
-
-### Monitoring Dashboards
-
-- [ ] **ETL Performance Dashboard**: Track sync times and success rates
-- [ ] **Data Quality Dashboard**: Track match accuracy and data completeness
-- [ ] **API Usage Dashboard**: Track API calls and quota usage
-- [ ] **Cost Dashboard**: Track GCP spending by service
-
-## 🔄 Operational Procedures
-
-### Backup & Recovery
-
-- [ ] **BigQuery Backups**: 
-  - Daily snapshots configured
-  - Retention policy: 30 days
-- [ ] **Terraform State**: 
-  - Stored in GCS bucket
-  - Versioning enabled
-- [ ] **Secret Backups**: 
-  - Documented secret locations
-  - Recovery procedures documented
-
-### Disaster Recovery Plan
-
-- [ ] **Recovery Time Objective (RTO)**: `[hours]`
-- [ ] **Recovery Point Objective (RPO)**: `[hours]`
-- [ ] **Backup Restoration Procedures**: Documented and tested
-- [ ] **Failover Procedures**: Documented
-
-### Maintenance Windows
-
-- [ ] **Scheduled Maintenance**: `[day/time]`
-- [ ] **Update Procedures**: Documented
-- [ ] **Rollback Procedures**: Documented and tested
-
-## 📝 Legal & Compliance
-
-### Data Privacy
-
-- [ ] **Data Processing Agreement**: Signed with all vendors
-- [ ] **Privacy Policy**: Updated to include data processing
-- [ ] **User Consent**: Obtained for data processing
-- [ ] **Data Retention Policy**: Documented and implemented
-
-### Compliance Requirements
-
-- [ ] **GDPR Compliance**: (if applicable)
-  - Right to deletion implemented
-  - Data export functionality
-- [ ] **CCPA Compliance**: (if applicable)
-  - Consumer rights implemented
-- [ ] **SOC 2**: (if required)
-  - Controls documented
-  - Audits scheduled
-
-## 🧪 Testing Requirements
-
-### Pre-Production Testing
-
-- [ ] **Unit Tests**: All tests passing
-- [ ] **Integration Tests**: All tests passing
-- [ ] **End-to-End Tests**: Critical paths tested
-- [ ] **Load Testing**: System tested under expected load
-- [ ] **Security Testing**: Security scan passed
-- [ ] **UAT**: User acceptance testing completed
-
-### Staging Environment
-
-- [ ] **Staging GCP Project**: Created and configured
-- [ ] **Staging Data**: Sample data loaded
-- [ ] **Staging Tests**: All functionality verified
-
-## 📞 Support & Escalation
-
-### Contact Information
-
-- [ ] **Primary Contact**: `[name]` - `[email]` - `[phone]`
-- [ ] **Technical Lead**: `[name]` - `[email]` - `[phone]`
-- [ ] **Salesforce Admin**: `[name]` - `[email]` - `[phone]`
-- [ ] **GCP Support**: Support plan level: `[Basic/Standard/Premium]`
-- [ ] **Vendor Support Contacts**:
-  - Salesforce Support: `[contact]`
-  - Dialpad Support: `[contact]`
-  - HubSpot Support: `[contact]`
-
-### Escalation Procedures
-
-- [ ] **Level 1**: Documented
-- [ ] **Level 2**: Documented
-- [ ] **Level 3**: Documented
-- [ ] **On-Call Rotation**: Established
-
-## ✅ Pre-Launch Checklist
-
-Before going live, verify:
-
-- [ ] All credentials configured in Secret Manager
-- [ ] All APIs enabled in GCP
-- [ ] All Cloud Functions deployed and tested
-- [ ] Cloud Scheduler jobs created and tested
-- [ ] BigQuery tables created and schema validated
-- [ ] Initial data sync completed successfully
-- [ ] Entity resolution accuracy verified (>90%)
-- [ ] Monitoring and alerting configured
-- [ ] Documentation reviewed and updated
-- [ ] Team trained on system operation
-- [ ] Backup and recovery procedures tested
-- [ ] Security review completed
-- [ ] Performance benchmarks met
-- [ ] UAT sign-off received
-
-## 📚 Additional Resources
-
-- [GCP Setup Guide](SETUP.md)
-- [Deployment Guide](DEPLOYMENT.md)
-- [Troubleshooting Guide](TROUBLESHOOTING.md)
-- [API Documentation](API.md)
-- [Architecture Documentation](ARCHITECTURE.md)
-
----
-
-**Last Updated**: [Date]
-**Version**: 1.0
-**Maintained By**: [Team/Contact]
-
+For issues:
+- Check Cloud Logging
+- Review Pub/Sub error notifications
+- Check BigQuery `etl_runs` table
+- Review test results

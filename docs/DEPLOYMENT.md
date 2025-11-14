@@ -19,10 +19,10 @@ terraform init
 
 ### 2. Create Terraform Variables File
 
-Create `terraform.tfvars`:
+Create `terraform.tfvars` (copy from `terraform.tfvars.example`):
 
 ```hcl
-project_id  = "your-gcp-project-id"
+project_id  = "maharani-sales-hub-11-2025"
 region      = "us-central1"
 environment = "prod"
 dataset_id  = "sales_intelligence"
@@ -37,9 +37,11 @@ terraform apply
 
 This will create:
 - BigQuery dataset
-- Service accounts
-- IAM roles
+- Service accounts with IAM roles
+- Pub/Sub topics and subscriptions
+- Cloud Scheduler jobs
 - Cloud Storage buckets
+- Dead letter queues for error handling
 - Required APIs enabled
 
 ## Secret Management
@@ -55,10 +57,15 @@ echo -n "your-value" | \
   gcloud secrets versions add secret-name --data-file=-
 ```
 
-Required secrets:
+Required secrets (see [SECRETS_LIST.md](../docs/SECRETS_LIST.md) for complete list):
+- `gmail-oauth-client-id`
+- `gmail-oauth-client-secret`
+- `salesforce-client-id`
+- `salesforce-client-secret`
 - `salesforce-username`
 - `salesforce-password`
 - `salesforce-security-token`
+- `salesforce-refresh-token`
 - `dialpad-api-key`
 - `hubspot-api-key`
 - `openai-api-key`
@@ -94,30 +101,53 @@ gcloud functions deploy gmail-sync \
 
 ## Setup Cloud Scheduler
 
+**Note**: Cloud Scheduler jobs are automatically created by Terraform. If deploying manually:
+
 ```bash
 # Gmail incremental sync (every hour)
 gcloud scheduler jobs create http gmail-incremental-sync \
   --location=us-central1 \
   --schedule="0 * * * *" \
-  --uri="https://us-central1-PROJECT_ID.cloudfunctions.net/gmail-sync" \
+  --uri="https://us-central1-maharani-sales-hub-11-2025.cloudfunctions.net/gmail-sync" \
   --http-method=POST \
-  --message-body='{"mailbox_email":"user@example.com","sync_type":"incremental"}' \
-  --oauth-service-account-email=SERVICE_ACCOUNT_EMAIL
+  --message-body='{"sync_type":"incremental"}' \
+  --oauth-service-account-email=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com
 
-# Salesforce daily sync
-gcloud scheduler jobs create http salesforce-daily-sync \
+# Gmail full sync (daily at 2 AM)
+gcloud scheduler jobs create http gmail-full-sync \
   --location=us-central1 \
   --schedule="0 2 * * *" \
-  --uri="https://us-central1-PROJECT_ID.cloudfunctions.net/salesforce-sync" \
+  --uri="https://us-central1-maharani-sales-hub-11-2025.cloudfunctions.net/gmail-sync" \
   --http-method=POST \
-  --message-body='{"object_type":"Account","sync_type":"incremental"}'
+  --message-body='{"sync_type":"full"}' \
+  --oauth-service-account-email=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com
+
+# Salesforce incremental sync (every 6 hours)
+gcloud scheduler jobs create http salesforce-incremental-sync \
+  --location=us-central1 \
+  --schedule="0 */6 * * *" \
+  --uri="https://us-central1-maharani-sales-hub-11-2025.cloudfunctions.net/salesforce-sync" \
+  --http-method=POST \
+  --message-body='{"object_type":"Account","sync_type":"incremental"}' \
+  --oauth-service-account-email=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com
+
+# Entity resolution (every 4 hours)
+gcloud scheduler jobs create http entity-resolution \
+  --location=us-central1 \
+  --schedule="0 */4 * * *" \
+  --uri="https://us-central1-maharani-sales-hub-11-2025.cloudfunctions.net/entity-resolution" \
+  --http-method=POST \
+  --message-body='{"batch_size":1000,"entity_type":"all"}' \
+  --oauth-service-account-email=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com
 ```
+
+**Recommended**: Use Terraform to manage all Cloud Scheduler jobs (see `infrastructure/scheduler.tf`).
 
 ## Create BigQuery Tables
 
 ```bash
 # Update project_id in SQL file
-sed "s/{project_id}/YOUR_PROJECT_ID/g" bigquery/schemas/create_tables.sql | \
+sed "s/{project_id}/maharani-sales-hub-11-2025/g" bigquery/schemas/create_tables.sql | \
   bq query --use_legacy_sql=false
 ```
 
@@ -132,7 +162,7 @@ bq ls sales_intelligence
 
 # Check ETL runs
 bq query --use_legacy_sql=false \
-  "SELECT * FROM \`PROJECT_ID.sales_intelligence.etl_runs\` ORDER BY started_at DESC LIMIT 10"
+  "SELECT * FROM \`maharani-sales-hub-11-2025.sales_intelligence.etl_runs\` ORDER BY started_at DESC LIMIT 10"
 
 # Test health check
 curl https://YOUR_FUNCTION_URL/health
@@ -173,14 +203,20 @@ gcloud functions deploy gmail-sync --version=VERSION_ID
 
 ## Production Checklist
 
-- [ ] All secrets configured in Secret Manager
-- [ ] IAM roles properly configured
-- [ ] Cloud Scheduler jobs created
-- [ ] BigQuery tables created
+- [ ] All secrets configured in Secret Manager (see [SECRETS_LIST.md](../docs/SECRETS_LIST.md))
+- [ ] Gmail domain-wide delegation configured in Google Workspace Admin
+- [ ] Service account IAM roles properly configured
+- [ ] Pub/Sub topics and subscriptions created (via Terraform)
+- [ ] Cloud Scheduler jobs created (via Terraform)
+- [ ] BigQuery dataset and tables created
+- [ ] Cloud Functions deployed with service account
+- [ ] Error notification monitoring configured
 - [ ] Monitoring and alerting configured
 - [ ] Backup and disaster recovery plan in place
-- [ ] Documentation updated
+- [ ] Documentation reviewed and updated
 - [ ] Team trained on operations
+
+See [DEPLOYMENT_SUMMARY.md](../docs/DEPLOYMENT_SUMMARY.md) for complete deployment guide.
 
 ## Troubleshooting
 

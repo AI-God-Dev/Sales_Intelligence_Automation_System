@@ -21,7 +21,7 @@ Before starting, ensure you have:
 
 ```bash
 # Set your project
-export GCP_PROJECT_ID="your-project-id"
+export GCP_PROJECT_ID="maharani-sales-hub-11-2025"
 gcloud config set project $GCP_PROJECT_ID
 
 # Create secrets (you'll add values in next step)
@@ -64,7 +64,7 @@ cd infrastructure
 
 # Create terraform.tfvars file
 cat > terraform.tfvars << EOF
-project_id  = "your-project-id"
+project_id  = "maharani-sales-hub-11-2025"
 region      = "us-central1"
 environment = "prod"
 dataset_id  = "sales_intelligence"
@@ -128,7 +128,7 @@ gcloud functions deploy gmail-sync \
   --source=cloud_functions/gmail_sync \
   --entry-point=gmail_sync \
   --trigger-http \
-  --service-account=YOUR_SERVICE_ACCOUNT_EMAIL \
+  --service-account=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com \
   --memory=512MB \
   --timeout=540s \
   --max-instances=10 \
