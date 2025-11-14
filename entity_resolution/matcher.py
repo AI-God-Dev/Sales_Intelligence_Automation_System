@@ -183,6 +183,96 @@ class EntityMatcher:
         results = self.bq_client.query(query, job_config)
         return results[0] if results else None
     
+    def match_phone_to_contact_enhanced(
+        self,
+        phone: str,
+        check_manual_mappings: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Enhanced phone matching with fuzzy matching support.
+        
+        Args:
+            phone: Phone number to match
+            check_manual_mappings: Whether to check manual_mappings table
+        
+        Returns:
+            Dictionary with contact_id, account_id, match_confidence or None
+        """
+        normalized_phone = normalize_phone(phone)
+        if not normalized_phone:
+            return None
+        
+        # Check manual mappings first
+        if check_manual_mappings:
+            manual_match = self._check_manual_phone_mapping(normalized_phone)
+            if manual_match:
+                return {
+                    "contact_id": manual_match.get("sf_contact_id"),
+                    "account_id": manual_match.get("sf_account_id"),
+                    "match_confidence": "manual"
+                }
+        
+        # Try exact match first
+        query = f"""
+        SELECT 
+            contact_id,
+            account_id,
+            phone,
+            mobile_phone
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_contacts`
+        WHERE phone = @phone OR mobile_phone = @phone
+        LIMIT 1
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("phone", "STRING", normalized_phone)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        
+        if results:
+            contact = results[0]
+            return {
+                "contact_id": contact["contact_id"],
+                "account_id": contact["account_id"],
+                "match_confidence": "exact"
+            }
+        
+        # Try fuzzy match (last 10 digits)
+        from utils.phone_normalizer import extract_last_10_digits
+        last_10 = extract_last_10_digits(normalized_phone)
+        if last_10:
+            fuzzy_query = f"""
+            SELECT 
+                contact_id,
+                account_id,
+                phone,
+                mobile_phone
+            FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_contacts`
+            WHERE REGEXP_EXTRACT(phone, r'\\d{{10}}$') = @last_10
+               OR REGEXP_EXTRACT(mobile_phone, r'\\d{{10}}$') = @last_10
+            LIMIT 1
+            """
+            
+            fuzzy_job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("last_10", "STRING", last_10)
+                ]
+            )
+            
+            fuzzy_results = self.bq_client.query(fuzzy_query, fuzzy_job_config)
+            if fuzzy_results:
+                contact = fuzzy_results[0]
+                return {
+                    "contact_id": contact["contact_id"],
+                    "account_id": contact["account_id"],
+                    "match_confidence": "fuzzy"
+                }
+        
+        return None
+    
     def update_participant_matches(self, batch_size: int = 1000) -> Dict[str, int]:
         """
         Batch update gmail_participants with contact/account matches.
@@ -196,7 +286,8 @@ class EntityMatcher:
         stats = {
             "processed": 0,
             "matched": 0,
-            "unmatched": 0
+            "unmatched": 0,
+            "errors": 0
         }
         
         # Get unmatched participants
@@ -210,27 +301,162 @@ class EntityMatcher:
         LIMIT {batch_size}
         """
         
-        participants = self.bq_client.query(query)
-        
-        updates = []
-        for participant in participants:
-            stats["processed"] += 1
-            match = self.match_email_to_contact(participant["email_address"])
+        try:
+            participants = self.bq_client.query(query)
             
-            if match:
-                updates.append({
-                    "participant_id": participant["participant_id"],
-                    "sf_contact_id": match["contact_id"],
-                    "sf_account_id": match["account_id"],
-                    "match_confidence": match["match_confidence"]
-                })
-                stats["matched"] += 1
-            else:
-                stats["unmatched"] += 1
-        
-        # Batch update (would need to use UPDATE statements or MERGE)
-        # For now, return stats - actual update logic would go here
-        logger.info(f"Entity resolution batch: {stats}")
+            updates = []
+            for participant in participants:
+                try:
+                    stats["processed"] += 1
+                    match = self.match_email_to_contact(participant["email_address"])
+                    
+                    if match:
+                        updates.append({
+                            "participant_id": participant["participant_id"],
+                            "sf_contact_id": match["contact_id"],
+                            "sf_account_id": match["account_id"],
+                            "match_confidence": match["match_confidence"]
+                        })
+                        stats["matched"] += 1
+                    else:
+                        stats["unmatched"] += 1
+                except Exception as e:
+                    logger.error(f"Error matching participant {participant.get('participant_id')}: {e}")
+                    stats["errors"] += 1
+            
+            # Batch update using MERGE statement
+            if updates:
+                self._batch_update_participants(updates)
+            
+            logger.info(f"Entity resolution batch: {stats}")
+            
+        except Exception as e:
+            logger.error(f"Error in batch participant matching: {e}", exc_info=True)
+            stats["errors"] += 1
         
         return stats
+    
+    def update_call_matches(self, batch_size: int = 1000) -> Dict[str, int]:
+        """
+        Batch update dialpad_calls with contact/account matches.
+        
+        Args:
+            batch_size: Number of calls to process at once
+        
+        Returns:
+            Dictionary with match statistics
+        """
+        stats = {
+            "processed": 0,
+            "matched": 0,
+            "unmatched": 0,
+            "errors": 0
+        }
+        
+        # Get unmatched calls
+        query = f"""
+        SELECT 
+            call_id,
+            from_number,
+            to_number
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.dialpad_calls`
+        WHERE matched_contact_id IS NULL
+          AND (from_number IS NOT NULL OR to_number IS NOT NULL)
+        LIMIT {batch_size}
+        """
+        
+        try:
+            calls = self.bq_client.query(query)
+            
+            updates = []
+            for call in calls:
+                try:
+                    stats["processed"] += 1
+                    
+                    # Try to match from_number first, then to_number
+                    phone = call.get("from_number") or call.get("to_number")
+                    match = self.match_phone_to_contact_enhanced(phone) if phone else None
+                    
+                    if match:
+                        updates.append({
+                            "call_id": call["call_id"],
+                            "matched_contact_id": match["contact_id"],
+                            "matched_account_id": match["account_id"]
+                        })
+                        stats["matched"] += 1
+                    else:
+                        stats["unmatched"] += 1
+                except Exception as e:
+                    logger.error(f"Error matching call {call.get('call_id')}: {e}")
+                    stats["errors"] += 1
+            
+            # Batch update using MERGE statement
+            if updates:
+                self._batch_update_calls(updates)
+            
+            logger.info(f"Call entity resolution batch: {stats}")
+            
+        except Exception as e:
+            logger.error(f"Error in batch call matching: {e}", exc_info=True)
+            stats["errors"] += 1
+        
+        return stats
+    
+    def _batch_update_participants(self, updates: List[Dict[str, Any]]):
+        """Batch update participants using MERGE statement."""
+        if not updates:
+            return
+        
+        # Build MERGE statement
+        values_list = []
+        for update in updates:
+            values_list.append(f"('{update['participant_id']}', '{update.get('sf_contact_id', '')}', '{update.get('sf_account_id', '')}', '{update.get('match_confidence', '')}')")
+        
+        query = f"""
+        MERGE `{self.bq_client.project_id}.{self.bq_client.dataset_id}.gmail_participants` AS target
+        USING (
+            SELECT * FROM UNNEST([
+                STRUCT<participant_id STRING, sf_contact_id STRING, sf_account_id STRING, match_confidence STRING>
+                {', '.join([f"('{u['participant_id']}', '{u.get('sf_contact_id', '')}', '{u.get('sf_account_id', '')}', '{u.get('match_confidence', '')}')" for u in updates])}
+            ])
+        ) AS source
+        ON target.participant_id = source.participant_id
+        WHEN MATCHED THEN
+            UPDATE SET
+                sf_contact_id = NULLIF(source.sf_contact_id, ''),
+                sf_account_id = NULLIF(source.sf_account_id, ''),
+                match_confidence = NULLIF(source.match_confidence, '')
+        """
+        
+        try:
+            self.bq_client.query(query)
+        except Exception as e:
+            logger.error(f"Error updating participants: {e}")
+            raise
+    
+    def _batch_update_calls(self, updates: List[Dict[str, Any]]):
+        """Batch update calls using MERGE statement."""
+        if not updates:
+            return
+        
+        query = f"""
+        MERGE `{self.bq_client.project_id}.{self.bq_client.dataset_id}.dialpad_calls` AS target
+        USING (
+            SELECT * FROM UNNEST([
+                STRUCT<call_id STRING, matched_contact_id STRING, matched_account_id STRING>
+                {', '.join([f"('{u['call_id']}', '{u.get('matched_contact_id', '')}', '{u.get('matched_account_id', '')}')" for u in updates])}
+            ])
+        ) AS source
+        ON target.call_id = source.call_id
+        WHEN MATCHED THEN
+            UPDATE SET
+                matched_contact_id = NULLIF(source.matched_contact_id, ''),
+                matched_account_id = NULLIF(source.matched_account_id, '')
+        """
+        
+        try:
+            self.bq_client.query(query)
+        except Exception as e:
+            logger.error(f"Error updating calls: {e}")
+            raise
 

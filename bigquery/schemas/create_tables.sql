@@ -206,6 +206,20 @@ OPTIONS(description="Manual overrides for entity resolution");
 -- Create indexes for common queries
 -- Note: BigQuery uses clustering instead of indexes, but we can create views for optimization
 
+-- 13. Gmail Sync State Table (for incremental sync tracking)
+CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.gmail_sync_state` (
+  mailbox_email STRING NOT NULL OPTIONS(description="Email address of mailbox"),
+  last_history_id STRING OPTIONS(description="Last processed Gmail history ID"),
+  last_sync_at TIMESTAMP OPTIONS(description="Last successful sync timestamp"),
+  sync_type STRING OPTIONS(description="'full' or 'incremental'"),
+  updated_at TIMESTAMP OPTIONS(description="When this record was last updated")
+)
+CLUSTER BY mailbox_email
+OPTIONS(description="Tracks sync state for each Gmail mailbox");
+
+-- Create indexes for common queries
+-- Note: BigQuery uses clustering instead of indexes, but we can create views for optimization
+
 -- View: Unmatched Email Participants
 CREATE OR REPLACE VIEW `{project_id}.sales_intelligence.v_unmatched_emails` AS
 SELECT 

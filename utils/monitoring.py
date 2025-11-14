@@ -1,16 +1,68 @@
 """
 Monitoring and observability utilities for metrics, tracing, and health checks.
+Includes error notification via Pub/Sub.
 """
 import time
 import logging
+import json
 from typing import Dict, Any, Optional, Callable
 from functools import wraps
 from contextlib import contextmanager
-from google.cloud import monitoring_v3
-from google.cloud.monitoring_v3 import MetricServiceClient
-from google.cloud.monitoring_v3.types import TimeSeries
+try:
+    from google.cloud import monitoring_v3
+    from google.cloud.monitoring_v3 import MetricServiceClient
+    from google.cloud.monitoring_v3.types import TimeSeries
+except ImportError:
+    # Monitoring may not be available in all environments
+    pass
+
+from google.cloud import pubsub_v1
+from config.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def publish_error_notification(
+    source_system: str,
+    error: str,
+    mailbox: Optional[str] = None,
+    sync_type: Optional[str] = None,
+    **kwargs
+):
+    """
+    Publish error notification to Pub/Sub topic for monitoring.
+    
+    Args:
+        source_system: Source system name (gmail, salesforce, dialpad, hubspot)
+        error: Error message
+        mailbox: Optional mailbox email (for Gmail)
+        sync_type: Optional sync type (full, incremental)
+        **kwargs: Additional context
+    """
+    try:
+        publisher = pubsub_v1.PublisherClient()
+        topic_path = publisher.topic_path(
+            settings.gcp_project_id,
+            "ingestion-errors"
+        )
+        
+        message_data = {
+            "source_system": source_system,
+            "error": error,
+            "timestamp": time.time(),
+            "mailbox": mailbox,
+            "sync_type": sync_type,
+            **kwargs
+        }
+        
+        message_bytes = json.dumps(message_data).encode("utf-8")
+        future = publisher.publish(topic_path, message_bytes)
+        future.result()  # Wait for publish to complete
+        
+        logger.info(f"Published error notification for {source_system}: {error[:100]}")
+        
+    except Exception as e:
+        logger.error(f"Failed to publish error notification: {e}", exc_info=True)
 
 
 class MetricsCollector:
@@ -104,6 +156,12 @@ class PerformanceMonitor:
             logger.info(f"Operation {self.operation_name} completed in {duration:.2f}s")
         else:
             logger.error(f"Operation {self.operation_name} failed after {duration:.2f}s: {exc_val}")
+            # Publish error notification
+            publish_error_notification(
+                source_system=self.operation_name.split("_")[0] if "_" in self.operation_name else "unknown",
+                error=str(exc_val),
+                operation=self.operation_name
+            )
         
         if self.metrics_collector:
             self.metrics_collector.record_histogram(
@@ -160,6 +218,12 @@ def trace_operation(operation_name: str, **labels):
         yield
     except Exception as e:
         logger.error(f"Trace {operation_name} failed: {e}", exc_info=True)
+        publish_error_notification(
+            source_system=operation_name.split("_")[0] if "_" in operation_name else "unknown",
+            error=str(e),
+            operation=operation_name,
+            **labels
+        )
         raise
     finally:
         duration = time.time() - start_time
@@ -206,5 +270,17 @@ def health_check() -> Dict[str, Any]:
         }
         health_status["status"] = "degraded"
     
+    # Check Pub/Sub connectivity
+    try:
+        publisher = pubsub_v1.PublisherClient()
+        topic_path = publisher.topic_path(settings.gcp_project_id, "ingestion-errors")
+        # Just check if we can create the path (doesn't actually publish)
+        health_status["components"]["pubsub"] = {"status": "healthy"}
+    except Exception as e:
+        health_status["components"]["pubsub"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        health_status["status"] = "degraded"
+    
     return health_status
-

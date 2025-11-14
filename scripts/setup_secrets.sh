@@ -3,16 +3,24 @@
 
 set -e
 
-PROJECT_ID="${GCP_PROJECT_ID:-your-project-id}"
+PROJECT_ID="${GCP_PROJECT_ID:-maharani-sales-hub-11-2025}"
+SERVICE_ACCOUNT="sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
 
 echo "Setting up secrets in Secret Manager for project: $PROJECT_ID"
 
 # Create secrets (values should be provided via environment variables or prompts)
 secrets=(
+  "gmail-oauth-client-id"
+  "gmail-oauth-client-secret"
+  "salesforce-client-id"
+  "salesforce-client-secret"
   "salesforce-username"
   "salesforce-password"
   "salesforce-security-token"
+  "salesforce-refresh-token"
   "dialpad-api-key"
+  "hubspot-client-id"
+  "hubspot-client-secret"
   "hubspot-api-key"
   "openai-api-key"
   "anthropic-api-key"
@@ -34,6 +42,13 @@ for secret in "${secrets[@]}"; do
     echo "Secret $secret created. Please add the value using:"
     echo "  echo -n 'YOUR_VALUE' | gcloud secrets versions add $secret --data-file=- --project=$PROJECT_ID"
   fi
+  
+  # Grant service account access to secret
+  echo "Granting service account access to secret: $secret"
+  gcloud secrets add-iam-policy-binding "$secret" \
+    --member="serviceAccount:$SERVICE_ACCOUNT" \
+    --role="roles/secretmanager.secretAccessor" \
+    --project="$PROJECT_ID" || echo "Warning: Could not grant access to $secret (may need manual setup)"
 done
 
 echo "Secret setup complete!"
