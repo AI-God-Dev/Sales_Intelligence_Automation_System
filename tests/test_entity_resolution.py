@@ -61,15 +61,23 @@ def test_match_email_to_contact_manual_mapping(entity_matcher, mock_bq_client):
     assert result["match_confidence"] == "manual"
 
 
-def test_match_phone_to_contact_exact_match(entity_matcher, mock_bq_client):
+@patch('entity_resolution.matcher.normalize_phone')
+def test_match_phone_to_contact_exact_match(mock_normalize, entity_matcher, mock_bq_client):
     """Test exact phone match."""
-    mock_bq_client.query.return_value = [{
-        "contact_id": "0031234567890ABC",
-        "account_id": "0011234567890ABC",
-        "phone": "+1234567890"
-    }]
+    # Mock phone normalization to return valid E.164 format
+    mock_normalize.return_value = "+12345678901"
     
-    result = entity_matcher.match_phone_to_contact("+1234567890")
+    # Mock query: first call is manual mapping (returns empty), second is exact match
+    mock_bq_client.query.side_effect = [
+        [],  # Manual mapping check returns empty
+        [{  # Exact match query returns result
+            "contact_id": "0031234567890ABC",
+            "account_id": "0011234567890ABC",
+            "phone": "+12345678901"
+        }]
+    ]
+    
+    result = entity_matcher.match_phone_to_contact("12345678901")
     
     assert result is not None
     assert result["contact_id"] == "0031234567890ABC"
@@ -121,15 +129,19 @@ def test_update_participant_matches(entity_matcher, mock_bq_client):
     assert stats["unmatched"] == 1
 
 
-def test_update_call_matches(entity_matcher, mock_bq_client):
+@patch('entity_resolution.matcher.normalize_phone')
+def test_update_call_matches(mock_normalize, entity_matcher, mock_bq_client):
     """Test batch call matching."""
-    # Mock query for unmatched calls
+    # Mock phone normalization to return valid E.164 format
+    mock_normalize.return_value = "+12345678901"
+    
+    # Mock query for unmatched calls, then phone match query
     mock_bq_client.query.side_effect = [
         [  # Unmatched calls
-            {"call_id": "c1", "from_number": "+1234567890", "to_number": None}
+            {"call_id": "c1", "from_number": "+12345678901", "to_number": None}
         ],
-        [  # Match result
-            {"contact_id": "0031234567890ABC", "account_id": "0011234567890ABC", "phone": "+1234567890"}
+        [  # Match result from match_phone_to_contact_enhanced
+            {"contact_id": "0031234567890ABC", "account_id": "0011234567890ABC", "phone": "+12345678901"}
         ]
     ]
     

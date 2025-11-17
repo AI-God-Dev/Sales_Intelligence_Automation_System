@@ -5,11 +5,16 @@ All sensitive values should be stored in Google Secret Manager.
 import os
 from typing import Optional
 from google.cloud import secretmanager
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application settings loaded from environment and Secret Manager."""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False
+    )
     
     # GCP Configuration
     gcp_project_id: str = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
@@ -22,10 +27,6 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._secret_client = None
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
     
     def get_secret(self, secret_id: str, version: str = "latest") -> str:
         """Retrieve secret from Google Secret Manager."""

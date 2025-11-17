@@ -1,0 +1,80 @@
+# .gcloudignore - Files to exclude when deploying Cloud Functions
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+tests/
+*.test.py
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Infrastructure
+infrastructure/
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+
+# Scripts (not needed in functions)
+scripts/
+
+# Examples
+examples/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.docx
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+PROJECT_STATUS.md
+TESTING_SUMMARY.md
+QUICK_TEST_GUIDE.md
+QUICK_START_TESTING.md
+INTEGRATION_MODULES_README.md
+PRODUCTION_READY_FEATURES.md
+

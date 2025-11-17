@@ -14,9 +14,13 @@ try:
     from google.cloud.monitoring_v3.types import TimeSeries
 except ImportError:
     # Monitoring may not be available in all environments
-    pass
-
-from google.cloud import pubsub_v1
+    monitoring_v3 = None
+    MetricServiceClient = None
+    TimeSeries = None
+try:
+    from google.cloud import pubsub_v1
+except ImportError:
+    pubsub_v1 = None
 from config.config import settings
 
 logger = logging.getLogger(__name__)
@@ -40,6 +44,10 @@ def publish_error_notification(
         **kwargs: Additional context
     """
     try:
+        if pubsub_v1 is None:
+            # Environment without Pub/Sub client; log and skip
+            logger.debug("Pub/Sub client not available; skipping notification publish")
+            return
         publisher = pubsub_v1.PublisherClient()
         topic_path = publisher.topic_path(
             settings.gcp_project_id,
@@ -76,12 +84,13 @@ class MetricsCollector:
             project_id: GCP project ID
         """
         self.project_id = project_id
-        self.client: Optional[MetricServiceClient] = None
+        # Avoid hard typing to MetricServiceClient when not available
+        self.client: Optional[Any] = None
         self._metrics: Dict[str, float] = {}
     
-    def _get_client(self) -> MetricServiceClient:
+    def _get_client(self):
         """Get or create monitoring client."""
-        if self.client is None:
+        if self.client is None and monitoring_v3 is not None and MetricServiceClient is not None:
             self.client = MetricServiceClient()
         return self.client
     

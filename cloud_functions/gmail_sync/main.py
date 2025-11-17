@@ -14,7 +14,7 @@ from utils.logger import setup_logger
 from utils.monitoring import publish_error_notification
 from utils.validation import validate_email, validate_sync_type, ValidationError
 from config.config import settings
-from gmail_dwd import get_gmail_service_for_user
+from .gmail_dwd import get_gmail_service_for_user
 
 logger = setup_logger(__name__)
 
@@ -113,12 +113,16 @@ def gmail_sync(request):
             status=status
         )
         
-        return {
+        response_body = {
             "status": status,
             "messages_synced": total_messages_synced,
             "errors": total_errors,
             "mailboxes_synced": len(mailboxes_to_sync)
-        }, 200
+        }
+        if status == "failed":
+            response_body["error"] = "Gmail sync failed"
+        http_status = 200 if status in ("success", "partial") else 500
+        return response_body, http_status
         
     except ValidationError as e:
         logger.warning(f"Validation error in Gmail sync: {e}")
