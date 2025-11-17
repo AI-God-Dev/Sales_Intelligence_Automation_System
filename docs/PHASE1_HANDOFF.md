@@ -9,6 +9,9 @@
 
 This document provides a comprehensive guide for handing off Phase 1 of the Sales Intelligence System to the next developer/team for real-world testing and deployment.
 
+> **Looking for a concise “do this, then that” runbook for validating Phase 1 in GCP?**  
+> See `docs/PHASE1_TESTING_GUIDE.md` for the step-by-step testing and deployment checklist.
+
 ---
 
 ## 📋 Phase 1 Deliverables Checklist
