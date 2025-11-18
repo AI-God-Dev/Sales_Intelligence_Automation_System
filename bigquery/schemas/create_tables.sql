@@ -2,11 +2,11 @@
 -- Run this script to create all required tables in BigQuery
 
 -- Dataset should be created separately with appropriate location
--- CREATE SCHEMA IF NOT EXISTS `{project_id}.sales_intelligence`
+-- CREATE SCHEMA IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence`
 -- OPTIONS(location="us-central1");
 
 -- 1. Gmail Messages Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.gmail_messages` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.gmail_messages` (
   message_id STRING NOT NULL OPTIONS(description="Gmail message ID (primary key)"),
   thread_id STRING OPTIONS(description="Gmail thread ID for grouping"),
   mailbox_email STRING NOT NULL OPTIONS(description="Which of the 3 mailboxes this came from"),
@@ -26,7 +26,7 @@ CLUSTER BY mailbox_email, from_email
 OPTIONS(description="All emails from 3 Gmail mailboxes");
 
 -- 2. Gmail Participants Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.gmail_participants` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.gmail_participants` (
   participant_id STRING NOT NULL OPTIONS(description="UUID primary key"),
   message_id STRING NOT NULL OPTIONS(description="Foreign key to gmail_messages"),
   email_address STRING NOT NULL OPTIONS(description="Normalized email address"),
@@ -39,7 +39,7 @@ CLUSTER BY email_address, sf_contact_id
 OPTIONS(description="Extracted email addresses from messages for entity resolution");
 
 -- 3. Salesforce Accounts Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.sf_accounts` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.sf_accounts` (
   account_id STRING NOT NULL OPTIONS(description="Salesforce Account ID (primary key)"),
   account_name STRING OPTIONS(description="Company name"),
   website STRING OPTIONS(description="Company website"),
@@ -55,7 +55,7 @@ CLUSTER BY owner_id, account_name
 OPTIONS(description="Salesforce Account records");
 
 -- 4. Salesforce Contacts Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.sf_contacts` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.sf_contacts` (
   contact_id STRING NOT NULL OPTIONS(description="Salesforce Contact ID (primary key)"),
   account_id STRING OPTIONS(description="Foreign key to sf_accounts"),
   first_name STRING OPTIONS(description="Contact first name"),
@@ -71,7 +71,7 @@ CLUSTER BY email, account_id
 OPTIONS(description="Salesforce Contact records");
 
 -- 5. Salesforce Leads Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.sf_leads` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.sf_leads` (
   lead_id STRING NOT NULL OPTIONS(description="Salesforce Lead ID (primary key)"),
   first_name STRING OPTIONS(description="Lead first name"),
   last_name STRING OPTIONS(description="Lead last name"),
@@ -91,7 +91,7 @@ CLUSTER BY email, owner_id
 OPTIONS(description="Salesforce Lead records (including system-created leads)");
 
 -- 6. Salesforce Opportunities Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.sf_opportunities` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.sf_opportunities` (
   opportunity_id STRING NOT NULL OPTIONS(description="Salesforce Opportunity ID (primary key)"),
   account_id STRING OPTIONS(description="Foreign key to sf_accounts"),
   name STRING OPTIONS(description="Opportunity name"),
@@ -108,7 +108,7 @@ CLUSTER BY account_id, owner_id, stage
 OPTIONS(description="Salesforce Opportunity records");
 
 -- 7. Salesforce Activities Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.sf_activities` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.sf_activities` (
   activity_id STRING NOT NULL OPTIONS(description="Salesforce Activity ID (primary key)"),
   activity_type STRING OPTIONS(description="'Task', 'Event', 'Call', 'Meeting'"),
   what_id STRING OPTIONS(description="Related Account/Opportunity ID"),
@@ -125,7 +125,7 @@ CLUSTER BY what_id, who_id, owner_id
 OPTIONS(description="Salesforce Tasks, Events, and other activities");
 
 -- 8. Dialpad Calls Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.dialpad_calls` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.dialpad_calls` (
   call_id STRING NOT NULL OPTIONS(description="Dialpad call ID (primary key)"),
   direction STRING OPTIONS(description="'inbound' or 'outbound'"),
   from_number STRING OPTIONS(description="Caller phone (E.164)"),
@@ -145,7 +145,7 @@ CLUSTER BY user_id, matched_account_id
 OPTIONS(description="Call logs and transcripts from Dialpad");
 
 -- 9. Account Recommendations Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.account_recommendations` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.account_recommendations` (
   recommendation_id STRING NOT NULL OPTIONS(description="UUID primary key"),
   account_id STRING NOT NULL OPTIONS(description="Foreign key to sf_accounts"),
   score_date DATE NOT NULL OPTIONS(description="Date score was generated"),
@@ -163,7 +163,7 @@ CLUSTER BY account_id, priority_score
 OPTIONS(description="Daily AI-generated account scoring and prioritization");
 
 -- 10. HubSpot Sequences Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.hubspot_sequences` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.hubspot_sequences` (
   sequence_id STRING NOT NULL OPTIONS(description="HubSpot sequence ID (primary key)"),
   sequence_name STRING OPTIONS(description="Display name"),
   is_active BOOLEAN OPTIONS(description="Whether sequence is active"),
@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.hubspot_sequences` (
 OPTIONS(description="Available HubSpot sequences for enrollment");
 
 -- 11. ETL Runs Table
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.etl_runs` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.etl_runs` (
   run_id STRING NOT NULL OPTIONS(description="UUID primary key"),
   source_system STRING NOT NULL OPTIONS(description="'gmail', 'salesforce', 'dialpad', 'hubspot'"),
   job_type STRING OPTIONS(description="'full', 'incremental', 'reconciliation'"),
@@ -190,7 +190,7 @@ CLUSTER BY source_system, status
 OPTIONS(description="Track ETL job execution and data quality");
 
 -- 12. Manual Mappings Table (for entity resolution overrides)
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.manual_mappings` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.manual_mappings` (
   mapping_id STRING NOT NULL OPTIONS(description="UUID primary key"),
   email_address STRING OPTIONS(description="Email to map"),
   phone_number STRING OPTIONS(description="Phone to map"),
@@ -207,7 +207,7 @@ OPTIONS(description="Manual overrides for entity resolution");
 -- Note: BigQuery uses clustering instead of indexes, but we can create views for optimization
 
 -- 13. Gmail Sync State Table (for incremental sync tracking)
-CREATE TABLE IF NOT EXISTS `{project_id}.sales_intelligence.gmail_sync_state` (
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.gmail_sync_state` (
   mailbox_email STRING NOT NULL OPTIONS(description="Email address of mailbox"),
   last_history_id STRING OPTIONS(description="Last processed Gmail history ID"),
   last_sync_at TIMESTAMP OPTIONS(description="Last successful sync timestamp"),
@@ -221,7 +221,7 @@ OPTIONS(description="Tracks sync state for each Gmail mailbox");
 -- Note: BigQuery uses clustering instead of indexes, but we can create views for optimization
 
 -- View: Unmatched Email Participants
-CREATE OR REPLACE VIEW `{project_id}.sales_intelligence.v_unmatched_emails` AS
+CREATE OR REPLACE VIEW `maharani-sales-hub-11-2025.sales_intelligence.v_unmatched_emails` AS
 SELECT 
   p.participant_id,
   p.email_address,
@@ -230,8 +230,8 @@ SELECT
   m.sent_at,
   m.mailbox_email,
   m.from_email
-FROM `{project_id}.sales_intelligence.gmail_participants` p
-JOIN `{project_id}.sales_intelligence.gmail_messages` m ON p.message_id = m.message_id
+FROM `maharani-sales-hub-11-2025.sales_intelligence.gmail_participants` p
+JOIN `maharani-sales-hub-11-2025.sales_intelligence.gmail_messages` m ON p.message_id = m.message_id
 WHERE p.sf_contact_id IS NULL
   AND p.role = 'from'
   AND m.sent_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)

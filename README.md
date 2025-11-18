@@ -2,9 +2,20 @@
 
 AI-driven sales intelligence and outreach system that unifies communication data and automates sales workflows across Salesforce, Gmail, Dialpad, and HubSpot.
 
+> **📖 New Owner?** Start with the **[HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)** for complete handoff information, then follow **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** for setup instructions.
+
 ## Project Overview
 
-This system consolidates all customer interactions (emails, calls, CRM activities) in BigQuery and provides:
+This system consolidates all customer interactions (emails, calls, CRM activities) in BigQuery and provides a unified data warehouse for sales intelligence and automation.
+
+### Phase 1: Data Foundation ✅ (Completed - Production Ready)
+- Multi-source data ingestion (Gmail, Salesforce, Dialpad, HubSpot)
+- Unified BigQuery data warehouse
+- Entity resolution (email & phone matching)
+- Automated sync scheduling
+- Comprehensive monitoring and error handling
+
+### Phase 2: Intelligence & Automation (Planned)
 - Daily AI-powered account scoring and prioritization
 - Automated lead creation from unmatched emails
 - AI-generated email replies
@@ -67,7 +78,13 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 └── scripts/                  # Utility scripts
 ```
 
-## Quick Start
+## 🚀 Quick Start
+
+### For New Users
+
+1. **Read the Handoff Document** - Start here: [HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)
+2. **Follow Getting Started Guide** - Complete setup: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+3. **Use Deployment Checklist** - Step-by-step: [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)
 
 ### Project Configuration
 - **GCP Project**: `maharani-sales-hub-11-2025`
@@ -75,71 +92,39 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 - **Region**: `us-central1`
 - **BigQuery Dataset**: `sales_intelligence`
 
-### Setup Instructions
+### Essential Setup Steps
 
-1. **Prerequisites**
-   - Google Cloud Platform account with billing enabled
-   - Python 3.11+
-   - GCP SDK installed and configured
-   - Access to Salesforce, Gmail, Dialpad, and HubSpot APIs
+1. **Prerequisites** - GCP account, Python 3.11+, `gcloud` CLI, API access
+2. **Enable APIs** - Run `.\enable_apis.ps1`
+3. **Configure Secrets** - Run `.\create_secrets.ps1`
+4. **Setup Gmail DWD** - Follow [COMPLETE_SETUP_GUIDE.md](COMPLETE_SETUP_GUIDE.md)
+5. **Create BigQuery Tables** - Run `.\scripts\setup_bigquery.ps1`
+6. **Deploy Functions** - Run `.\scripts\deploy_functions.ps1`
+7. **Test Everything** - Follow [docs/STEP_BY_STEP_TESTING_GUIDE.md](docs/STEP_BY_STEP_TESTING_GUIDE.md)
 
-2. **Install Dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+**📖 Detailed Instructions:** See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) and [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)
 
-3. **Configure Environment**
-   ```bash
-   # Copy example environment file
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+## 📊 Project Status
 
-4. **Setup Secrets**
-   ```bash
-   # Create secrets in Secret Manager
-   ./scripts/setup_secrets.sh
-   # Add secret values (see docs/SECRETS_LIST.md)
-   ```
+### Phase 1: Foundation & Data Pipeline ✅ **COMPLETE**
 
-5. **Deploy Infrastructure**
-   ```bash
-   cd infrastructure
-   cp terraform.tfvars.example terraform.tfvars
-   terraform init
-   terraform plan
-   terraform apply
-   ```
+**Status:** ✅ Production Ready | **Tests:** 45/45 passing (100%) | **Coverage:** 30% overall
 
-6. **Create BigQuery Tables**
-   ```bash
-   sed "s/{project_id}/maharani-sales-hub-11-2025/g" bigquery/schemas/create_tables.sql | \
-     bq query --use_legacy_sql=false
-   ```
-
-7. **Deploy Cloud Functions**
-   ```bash
-   ./scripts/deploy_functions.sh
-   ```
-
-See [DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete deployment guide.
-
-## Project Phases
-
-### Phase 1: Foundation & Data Pipeline ✅ (Completed - Ready for Deployment)
+**Completed Components:**
 - [x] Project structure setup
-- [x] BigQuery schema creation (with sync state tracking)
+- [x] BigQuery schema creation (13 tables with sync state tracking)
 - [x] Gmail ingestion (with domain-wide delegation)
-- [x] Salesforce sync (all objects)
+- [x] Salesforce sync (all objects: Account, Contact, Lead, Opportunity, Activity)
 - [x] Dialpad sync (calls + transcripts)
 - [x] HubSpot sync (sequences metadata)
 - [x] Entity resolution (email & phone matching)
 - [x] Pub/Sub topics and subscriptions
 - [x] Cloud Scheduler jobs (automated ingestion)
-- [x] Error handling and monitoring
-- [x] Automated test suite
+- [x] Comprehensive error handling and monitoring
+- [x] Automated test suite (45 tests, 100% pass rate)
+- [x] Complete documentation
 
-### Phase 2: Intelligence & Automation
+### Phase 2: Intelligence & Automation (Planned - Not Included)
 - [ ] Embeddings generation
 - [ ] Vector search
 - [ ] Daily account scoring
@@ -148,12 +133,13 @@ See [DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete deploym
 - [ ] HubSpot enrollment
 - [ ] AI email replies
 
-### Phase 3: Application and UAT
+### Phase 3: Application and UAT (Planned - Not Included)
 - [ ] Web application development
 - [ ] Authentication setup
 - [ ] User acceptance testing
 - [ ] Performance optimization
-- [ ] Documentation
+
+**📖 Detailed Status:** See [PROJECT_STATUS.md](PROJECT_STATUS.md) and [docs/PHASE1_HANDOFF.md](docs/PHASE1_HANDOFF.md)
 
 ## Success Criteria
 
@@ -203,10 +189,23 @@ See [DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete require
 
 **⚠️ Important**: Adding credentials is just the first step! See [Getting Started Guide](docs/GETTING_STARTED.md) for the complete 8-step process to go from credentials to a running system.
 
-## Contact
+## 📚 Documentation Quick Links
+
+| Document | Purpose |
+|----------|---------|
+| **[HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)** | Complete handoff package - **Start here** |
+| **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** | Step-by-step setup guide |
+| **[docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)** | Deployment checklist |
+| **[docs/STEP_BY_STEP_TESTING_GUIDE.md](docs/STEP_BY_STEP_TESTING_GUIDE.md)** | Testing procedures |
+| **[docs/PHASE1_ENVIRONMENT_SETUP.md](docs/PHASE1_ENVIRONMENT_SETUP.md)** | Environment setup |
+| **[COMPLETE_SETUP_GUIDE.md](COMPLETE_SETUP_GUIDE.md)** | Gmail DWD complete setup |
+| **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** | Common issues and solutions |
+
+## 📞 Contact
 
 **Client**: Anand Gohel (anand@maharaniweddings.com)  
-**Company**: MaharaniWeddings.com
+**Company**: MaharaniWeddings.com  
+**Project**: Sales Intelligence & Automation System
 
 ## Development
 

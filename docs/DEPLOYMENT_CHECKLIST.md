@@ -2,6 +2,8 @@
 
 Complete checklist for deploying the Sales Intelligence System to production.
 
+> **📖 New User?** Start with **[HANDOFF_DOCUMENT.md](../HANDOFF_DOCUMENT.md)** for complete handoff information, then follow **[GETTING_STARTED.md](GETTING_STARTED.md)** for detailed setup instructions.
+
 ## Pre-Deployment
 
 ### Project Information

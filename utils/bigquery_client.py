@@ -95,18 +95,14 @@ class BigQueryClient:
             try:
                 table_ref = self.dataset_ref.table(table_id)
                 
-                # Configure job for error handling
-                job_config = bigquery.LoadJobConfig(
-                    source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-                    write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-                    skip_leading_rows=0,
-                    ignore_unknown_values=ignore_unknown_values
-                )
-                
+                # Insert rows using insert_rows_json
+                # Note: insert_rows_json doesn't accept job_config parameter
+                # Use skip_invalid_rows and ignore_unknown_values directly
                 errors = self.client.insert_rows_json(
                     table_ref,
                     rows,
-                    job_config=job_config if skip_invalid_rows else None
+                    skip_invalid_rows=skip_invalid_rows,
+                    ignore_unknown_values=ignore_unknown_values
                 )
                 
                 if errors:

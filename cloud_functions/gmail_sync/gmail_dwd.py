@@ -42,10 +42,49 @@ def get_gmail_service_for_user(
         else:
             # Use default credentials (when running in Cloud Functions)
             from google.auth import default
-            credentials, _ = default(scopes=GMAIL_SCOPES)
-        
-        # Delegate domain-wide authority to impersonate the user
-        delegated_credentials = credentials.with_subject(user_email)
+            credentials, project = default(scopes=GMAIL_SCOPES)
+            
+            # In Cloud Functions Gen2, default() returns ComputeEngineCredentials
+            # which don't support with_subject() directly for DWD
+            # Try to load service account key from Secret Manager for DWD
+            if not isinstance(credentials, service_account.Credentials):
+                try:
+                    # Try to load service account key from Secret Manager
+                    from config.config import settings
+                    import json
+                    import io
+                    
+                    try:
+                        sa_key_json = settings.get_secret("service-account-key-json")
+                        sa_key_dict = json.loads(sa_key_json)
+                        # Create ServiceAccountCredentials from the key
+                        credentials = service_account.Credentials.from_service_account_info(
+                            sa_key_dict,
+                            scopes=GMAIL_SCOPES
+                        )
+                        logger.info("Loaded service account key from Secret Manager for DWD")
+                    except Exception as e:
+                        logger.warning(f"Could not load service account key from Secret Manager: {e}")
+                        # Fall back to error - DWD requires ServiceAccountCredentials
+                        raise NotImplementedError(
+                            f"Domain-Wide Delegation requires ServiceAccountCredentials, "
+                            f"but default() returned {type(credentials)}. "
+                            f"Please store the service account private key JSON in Secret Manager "
+                            f"as 'service-account-key-json' for DWD support."
+                        )
+                except Exception as e:
+                    if isinstance(e, NotImplementedError):
+                        raise
+                    # If Secret Manager access fails, raise clear error
+                    raise NotImplementedError(
+                        f"Domain-Wide Delegation requires ServiceAccountCredentials. "
+                        f"Default credentials type: {type(credentials)}. "
+                        f"Please configure service account key in Secret Manager."
+                    )
+            
+            # Now credentials should be ServiceAccountCredentials
+            # Use with_subject for DWD
+            delegated_credentials = credentials.with_subject(user_email)
         
         # Build Gmail API service
         service = build('gmail', 'v1', credentials=delegated_credentials)
