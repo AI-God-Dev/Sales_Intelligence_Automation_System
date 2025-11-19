@@ -1,12 +1,6 @@
 # Pub/Sub Topics for Ingestion Pipelines
 
-# Enable Pub/Sub API
-resource "google_project_service" "pubsub_api" {
-  project = var.project_id
-  service = "pubsub.googleapis.com"
-  
-  disable_dependent_services = false
-}
+# Note: Pub/Sub API is enabled in main.tf via google_project_service.required_apis
 
 # Gmail Ingestion Topic
 resource "google_pubsub_topic" "gmail_ingestion" {
@@ -21,7 +15,7 @@ resource "google_pubsub_topic" "gmail_ingestion" {
   
   message_retention_duration = "604800s" # 7 days
   
-  depends_on = [google_project_service.pubsub_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Gmail Ingestion Subscription (for error handling)
@@ -73,7 +67,7 @@ resource "google_pubsub_topic" "salesforce_ingestion" {
   
   message_retention_duration = "604800s" # 7 days
   
-  depends_on = [google_project_service.pubsub_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Salesforce Ingestion Subscription (for error handling)
@@ -125,7 +119,7 @@ resource "google_pubsub_topic" "dialpad_ingestion" {
   
   message_retention_duration = "604800s" # 7 days
   
-  depends_on = [google_project_service.pubsub_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Dialpad Ingestion Subscription (for error handling)
@@ -177,7 +171,7 @@ resource "google_pubsub_topic" "hubspot_ingestion" {
   
   message_retention_duration = "604800s" # 7 days
   
-  depends_on = [google_project_service.pubsub_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # HubSpot Ingestion Subscription (for error handling)
@@ -229,7 +223,7 @@ resource "google_pubsub_topic" "ingestion_errors" {
   
   message_retention_duration = "2592000s" # 30 days
   
-  depends_on = [google_project_service.pubsub_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Grant service account permissions to publish to topics

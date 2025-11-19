@@ -1,19 +1,6 @@
 # Cloud Scheduler Jobs for Data Ingestion Automation
 
-# Enable Cloud Scheduler API
-resource "google_project_service" "scheduler_api" {
-  project = var.project_id
-  service = "cloudscheduler.googleapis.com"
-  
-  disable_dependent_services = false
-}
-
-# Service Account for Cloud Scheduler (uses the existing service account)
-variable "service_account_email" {
-  description = "Service account email for Cloud Functions and Scheduler"
-  type        = string
-  default     = "sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
-}
+# Note: Cloud Scheduler API is enabled in main.tf via google_project_service.required_apis
 
 # Gmail Incremental Sync Job (runs every hour)
 resource "google_cloud_scheduler_job" "gmail_incremental_sync" {
@@ -38,7 +25,7 @@ resource "google_cloud_scheduler_job" "gmail_incremental_sync" {
     }))
     
     oidc_token {
-      service_account_email = var.service_account_email
+      service_account_email = data.google_service_account.existing_sa.email
     }
   }
   
@@ -50,7 +37,7 @@ resource "google_cloud_scheduler_job" "gmail_incremental_sync" {
     max_doublings = 5
   }
   
-  depends_on = [google_project_service.scheduler_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Gmail Full Sync Job (runs daily at 2 AM)
@@ -76,7 +63,7 @@ resource "google_cloud_scheduler_job" "gmail_full_sync" {
     }))
     
     oidc_token {
-      service_account_email = var.service_account_email
+      service_account_email = data.google_service_account.existing_sa.email
     }
   }
   
@@ -88,7 +75,7 @@ resource "google_cloud_scheduler_job" "gmail_full_sync" {
     max_doublings = 5
   }
   
-  depends_on = [google_project_service.scheduler_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Salesforce Incremental Sync Job (runs every 6 hours)
@@ -114,7 +101,7 @@ resource "google_cloud_scheduler_job" "salesforce_incremental_sync" {
     }))
     
     oidc_token {
-      service_account_email = var.service_account_email
+      service_account_email = data.google_service_account.existing_sa.email
     }
   }
   
@@ -126,7 +113,7 @@ resource "google_cloud_scheduler_job" "salesforce_incremental_sync" {
     max_doublings = 5
   }
   
-  depends_on = [google_project_service.scheduler_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Salesforce Full Sync Job (runs weekly on Sunday at 3 AM)
@@ -152,7 +139,7 @@ resource "google_cloud_scheduler_job" "salesforce_full_sync" {
     }))
     
     oidc_token {
-      service_account_email = var.service_account_email
+      service_account_email = data.google_service_account.existing_sa.email
     }
   }
   
@@ -164,7 +151,7 @@ resource "google_cloud_scheduler_job" "salesforce_full_sync" {
     max_doublings = 5
   }
   
-  depends_on = [google_project_service.scheduler_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Dialpad Sync Job (runs daily at 1 AM)
@@ -189,7 +176,7 @@ resource "google_cloud_scheduler_job" "dialpad_sync" {
     }))
     
     oidc_token {
-      service_account_email = var.service_account_email
+      service_account_email = data.google_service_account.existing_sa.email
     }
   }
   
@@ -201,7 +188,7 @@ resource "google_cloud_scheduler_job" "dialpad_sync" {
     max_doublings = 5
   }
   
-  depends_on = [google_project_service.scheduler_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # HubSpot Sync Job (runs daily at 4 AM)
@@ -226,7 +213,7 @@ resource "google_cloud_scheduler_job" "hubspot_sync" {
     }))
     
     oidc_token {
-      service_account_email = var.service_account_email
+      service_account_email = data.google_service_account.existing_sa.email
     }
   }
   
@@ -238,7 +225,7 @@ resource "google_cloud_scheduler_job" "hubspot_sync" {
     max_doublings = 5
   }
   
-  depends_on = [google_project_service.scheduler_api]
+  depends_on = [google_project_service.required_apis]
 }
 
 # Entity Resolution Job (runs every 4 hours)
@@ -263,7 +250,7 @@ resource "google_cloud_scheduler_job" "entity_resolution" {
     }))
     
     oidc_token {
-      service_account_email = var.service_account_email
+      service_account_email = data.google_service_account.existing_sa.email
     }
   }
   
@@ -275,6 +262,6 @@ resource "google_cloud_scheduler_job" "entity_resolution" {
     max_doublings = 3
   }
   
-  depends_on = [google_project_service.scheduler_api]
+  depends_on = [google_project_service.required_apis]
 }
 
