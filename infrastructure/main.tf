@@ -29,30 +29,6 @@ provider "google-beta" {
   region  = var.region
 }
 
-# Variables
-variable "project_id" {
-  description = "GCP Project ID"
-  type        = string
-}
-
-variable "region" {
-  description = "GCP Region"
-  type        = string
-  default     = "us-central1"
-}
-
-variable "dataset_id" {
-  description = "BigQuery Dataset ID"
-  type        = string
-  default     = "sales_intelligence"
-}
-
-variable "environment" {
-  description = "Environment (dev, staging, prod)"
-  type        = string
-  default     = "dev"
-}
-
 # Enable required APIs
 resource "google_project_service" "required_apis" {
   for_each = toset([
@@ -181,22 +157,5 @@ resource "google_storage_bucket" "function_source" {
       type = "Delete"
     }
   }
-}
-
-# Outputs
-output "project_id" {
-  value = var.project_id
-}
-
-output "dataset_id" {
-  value = google_bigquery_dataset.sales_intelligence.dataset_id
-}
-
-output "service_account_email" {
-  value = data.google_service_account.existing_sa.email
-}
-
-output "function_source_bucket" {
-  value = google_storage_bucket.function_source.name
 }
 

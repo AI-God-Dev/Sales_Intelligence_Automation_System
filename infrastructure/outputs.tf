@@ -17,7 +17,7 @@ output "dataset_id" {
 
 output "service_account_email" {
   description = "Service account email for Cloud Functions"
-  value       = "sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  value       = data.google_service_account.existing_sa.email
 }
 
 output "function_source_bucket" {
