@@ -4,11 +4,19 @@ Creates BigQuery tables for storing data from Gmail, Salesforce, Dialpad, and Hu
 Uses service account (sales-intel-poc-sa) for authentication.
 """
 import os
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 import logging
 from typing import List, Dict, Any, Optional
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
-from utils.secret_manager import get_secret_client
+# from utils.secret_manager import get_secret_client  # Not needed for this script
 
 logger = logging.getLogger(__name__)
 
