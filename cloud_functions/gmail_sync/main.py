@@ -3,18 +3,45 @@ Gmail Sync Cloud Function
 Ingests all messages from 3 Gmail mailboxes (full + incremental sync)
 Uses domain-wide delegation (DWD) with service account for authentication
 """
+import sys
+import os
+from pathlib import Path
+
+# Add project root to Python path for imports
+# This ensures utils, config, and entity_resolution modules are found
+_project_root = Path(__file__).parent.parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 import functions_framework
 import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from google.cloud import bigquery
 from googleapiclient.discovery import build
-from utils.bigquery_client import BigQueryClient
-from utils.logger import setup_logger
-from utils.monitoring import publish_error_notification
-from utils.validation import validate_email, validate_sync_type, ValidationError
-from config.config import settings
-from .gmail_dwd import get_gmail_service_for_user
+
+# Now import project modules (after path is set)
+try:
+    from utils.bigquery_client import BigQueryClient
+    from utils.logger import setup_logger
+    from utils.monitoring import publish_error_notification
+    from utils.validation import validate_email, validate_sync_type, ValidationError
+    from config.config import settings
+    from cloud_functions.gmail_sync.gmail_dwd import get_gmail_service_for_user
+except ImportError as e:
+    # Log import errors but allow function to be registered
+    logging.error(f"Import error during module load: {e}")
+    logging.error(f"Python path: {sys.path}")
+    logging.error(f"Project root: {_project_root}")
+    # Define fallbacks if imports fail (will be caught at runtime)
+    BigQueryClient = None
+    setup_logger = logging.getLogger
+    publish_error_notification = lambda *args, **kwargs: None
+    ValidationError = Exception
+    validate_email = lambda x: x
+    validate_sync_type = lambda x: x
+    settings = None
+    get_gmail_service_for_user = None
 
 logger = setup_logger(__name__)
 
@@ -30,6 +57,12 @@ def gmail_sync(request):
     - sync_type: 'full' or 'incremental' (default: 'incremental')
     """
     try:
+        # Verify imports worked
+        if BigQueryClient is None or settings is None:
+            error_msg = f"Failed to import required modules. Project root: {_project_root}, Python path: {sys.path}"
+            logger.error(error_msg)
+            return {"error": "Internal server error - module import failed", "message": error_msg}, 500
+        
         request_json = request.get_json(silent=True) or {}
         mailbox_email = request_json.get("mailbox_email")
         sync_type = request_json.get("sync_type", "incremental")
@@ -133,11 +166,14 @@ def gmail_sync(request):
         }, 400
     except Exception as e:
         logger.error(f"Gmail sync failed: {str(e)}", exc_info=True)
-        publish_error_notification(
-            source_system="gmail",
-            error=str(e),
-            sync_type=request_json.get("sync_type", "unknown")
-        )
+        try:
+            publish_error_notification(
+                source_system="gmail",
+                error=str(e),
+                sync_type=request_json.get("sync_type", "unknown")
+            )
+        except:
+            pass  # Ignore notification errors
         return {
             "error": "Internal server error",
             "message": "An unexpected error occurred during Gmail sync. Please check logs for details.",
@@ -464,4 +500,3 @@ def _parse_timestamp(date_string: str) -> str:
         return dt.isoformat()
     except Exception:
         return datetime.now(timezone.utc).isoformat()
-
