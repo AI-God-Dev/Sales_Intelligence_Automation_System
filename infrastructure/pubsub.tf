@@ -80,7 +80,7 @@ resource "google_pubsub_subscription" "salesforce_ingestion_errors" {
   retain_acked_messages = false
   
   expiration_policy {
-    ttl = "300000.5s"
+    ttl = "604800s" # 7 days (must be >= topic message retention duration)
   }
   
   retry_policy {
@@ -132,7 +132,7 @@ resource "google_pubsub_subscription" "dialpad_ingestion_errors" {
   retain_acked_messages = false
   
   expiration_policy {
-    ttl = "300000.5s"
+    ttl = "604800s" # 7 days (must be >= topic message retention duration)
   }
   
   retry_policy {
@@ -184,7 +184,7 @@ resource "google_pubsub_subscription" "hubspot_ingestion_errors" {
   retain_acked_messages = false
   
   expiration_policy {
-    ttl = "300000.5s"
+    ttl = "604800s" # 7 days (must be >= topic message retention duration)
   }
   
   retry_policy {
