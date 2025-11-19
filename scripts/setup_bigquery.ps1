@@ -2,9 +2,18 @@
 # Creates the sales_intelligence dataset and all required tables
 
 $ErrorActionPreference = "Stop"
-$projectId = "maharani-sales-hub-11-2025"
-$region = "us-central1"
-$datasetId = "sales_intelligence"
+
+# Get configuration from environment variables or use defaults
+$projectId = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "maharani-sales-hub-11-2025" }
+$region = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
+$datasetId = if ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
+
+# Validate required variables
+if (-not $projectId) {
+    Write-Host "[ERROR] GCP_PROJECT_ID environment variable is not set" -ForegroundColor Red
+    Write-Host "Set it with: `$env:GCP_PROJECT_ID = 'your-project-id'" -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "BigQuery Dataset and Tables Setup" -ForegroundColor Cyan
@@ -15,8 +24,10 @@ Write-Host ""
 
 # Step 1: Prepare SQL file (replace placeholders)
 Write-Host "Step 1: Preparing SQL file..." -ForegroundColor Green
-$sqlFile = "bigquery\schemas\create_tables.sql"
-$sqlFileTemp = "bigquery\schemas\create_tables_temp.sql"
+# Use cross-platform path handling
+$projectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$sqlFile = Join-Path $projectRoot "bigquery\schemas\create_tables.sql"
+$sqlFileTemp = Join-Path $projectRoot "bigquery\schemas\create_tables_temp.sql"
 
 if (-not (Test-Path $sqlFile)) {
     Write-Host "ERROR: SQL file not found at $sqlFile" -ForegroundColor Red

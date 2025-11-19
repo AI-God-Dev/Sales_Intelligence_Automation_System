@@ -29,26 +29,55 @@ class Settings(BaseSettings):
         self._secret_client = None
     
     def get_secret(self, secret_id: str, version: str = "latest") -> str:
-        """Retrieve secret from Google Secret Manager."""
-        if self._secret_client is None:
-            self._secret_client = secretmanager.SecretManagerServiceClient()
+        """
+        Retrieve secret from Google Secret Manager.
         
-        name = f"projects/{self.gcp_project_id}/secrets/{secret_id}/versions/{version}"
-        response = self._secret_client.access_secret_version(request={"name": name})
-        return response.payload.data.decode("UTF-8")
+        Args:
+            secret_id: Secret identifier
+            version: Secret version (default: "latest")
+            
+        Returns:
+            Secret value as string
+            
+        Raises:
+            Exception: If secret retrieval fails
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        try:
+            if self._secret_client is None:
+                self._secret_client = secretmanager.SecretManagerServiceClient()
+            
+            name = f"projects/{self.gcp_project_id}/secrets/{secret_id}/versions/{version}"
+            response = self._secret_client.access_secret_version(request={"name": name})
+            return response.payload.data.decode("UTF-8")
+        except Exception as e:
+            error_msg = f"Failed to retrieve secret '{secret_id}' from Secret Manager: {str(e)}"
+            logger.error(error_msg)
+            raise Exception(error_msg) from e
     
     # API Credentials (loaded from Secret Manager)
     @property
     def salesforce_username(self) -> str:
-        return self.get_secret("salesforce-username")
+        try:
+            return self.get_secret("salesforce-username")
+        except Exception:
+            raise Exception("Salesforce username not found in Secret Manager. Please set 'salesforce-username' secret.")
     
     @property
     def salesforce_password(self) -> str:
-        return self.get_secret("salesforce-password")
+        try:
+            return self.get_secret("salesforce-password")
+        except Exception:
+            raise Exception("Salesforce password not found in Secret Manager. Please set 'salesforce-password' secret.")
     
     @property
     def salesforce_security_token(self) -> str:
-        return self.get_secret("salesforce-security-token")
+        try:
+            return self.get_secret("salesforce-security-token")
+        except Exception:
+            raise Exception("Salesforce security token not found in Secret Manager. Please set 'salesforce-security-token' secret.")
     
     @property
     def salesforce_domain(self) -> str:
@@ -56,19 +85,31 @@ class Settings(BaseSettings):
     
     @property
     def dialpad_api_key(self) -> str:
-        return self.get_secret("dialpad-api-key")
+        try:
+            return self.get_secret("dialpad-api-key")
+        except Exception:
+            raise Exception("Dialpad API key not found in Secret Manager. Please set 'dialpad-api-key' secret.")
     
     @property
     def hubspot_api_key(self) -> str:
-        return self.get_secret("hubspot-api-key")
+        try:
+            return self.get_secret("hubspot-api-key")
+        except Exception:
+            raise Exception("HubSpot API key not found in Secret Manager. Please set 'hubspot-api-key' secret.")
     
     @property
     def openai_api_key(self) -> str:
-        return self.get_secret("openai-api-key")
+        try:
+            return self.get_secret("openai-api-key")
+        except Exception:
+            return ""  # Optional for Phase 1
     
     @property
     def anthropic_api_key(self) -> str:
-        return self.get_secret("anthropic-api-key")
+        try:
+            return self.get_secret("anthropic-api-key")
+        except Exception:
+            return ""  # Optional for Phase 1
     
     # Gmail OAuth (handled via OAuth flow, not stored)
     gmail_oauth_client_id: str = os.getenv("GMAIL_OAUTH_CLIENT_ID", "")

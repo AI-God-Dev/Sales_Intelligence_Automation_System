@@ -2,9 +2,18 @@
 # Deploys from project root to include shared modules (utils, config, entity_resolution)
 
 $ErrorActionPreference = "Stop"
-$projectId = "maharani-sales-hub-11-2025"
-$region = "us-central1"
-$serviceAccount = "sales-intel-poc-sa@$projectId.iam.gserviceaccount.com"
+
+# Get configuration from environment variables or use defaults
+$projectId = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "maharani-sales-hub-11-2025" }
+$region = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
+$serviceAccount = if ($env:GCP_SERVICE_ACCOUNT) { $env:GCP_SERVICE_ACCOUNT } else { "sales-intel-poc-sa@$projectId.iam.gserviceaccount.com" }
+
+# Validate required variables
+if (-not $projectId) {
+    Write-Host "[ERROR] GCP_PROJECT_ID environment variable is not set" -ForegroundColor Red
+    Write-Host "Set it with: `$env:GCP_PROJECT_ID = 'your-project-id'" -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Deploying Cloud Functions" -ForegroundColor Cyan
@@ -56,30 +65,31 @@ function Deploy-Function {
 }
 
 # Deploy all functions
+# IMPORTANT: Entry points must use full module path format: module.submodule.function
 $functions = @(
     @{
         Name = "gmail-sync"
-        EntryPoint = "gmail_sync"
+        EntryPoint = "cloud_functions.gmail_sync.main.gmail_sync"
         Description = "Gmail message ingestion"
     },
     @{
         Name = "salesforce-sync"
-        EntryPoint = "salesforce_sync"
+        EntryPoint = "cloud_functions.salesforce_sync.main.salesforce_sync"
         Description = "Salesforce object ingestion"
     },
     @{
         Name = "dialpad-sync"
-        EntryPoint = "dialpad_sync"
+        EntryPoint = "cloud_functions.dialpad_sync.main.dialpad_sync"
         Description = "Dialpad call logs ingestion"
     },
     @{
         Name = "hubspot-sync"
-        EntryPoint = "hubspot_sync"
+        EntryPoint = "cloud_functions.hubspot_sync.main.hubspot_sync"
         Description = "HubSpot sequences ingestion"
     },
     @{
         Name = "entity-resolution"
-        EntryPoint = "entity_resolution"
+        EntryPoint = "cloud_functions.entity_resolution.main.entity_resolution"
         Description = "Entity resolution and matching"
     }
 )

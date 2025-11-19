@@ -6,8 +6,18 @@
 # 3. Created third-party API credentials (see MANUAL_STEPS.md)
 
 $ErrorActionPreference = "Stop"
-$projectId = "maharani-sales-hub-11-2025"
-$region = "us-central1"
+
+# Get configuration from environment variables or use defaults
+$projectId = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "maharani-sales-hub-11-2025" }
+$region = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
+
+# Validate required variables
+if (-not $projectId) {
+    Write-Host "[ERROR] GCP_PROJECT_ID environment variable is not set" -ForegroundColor Red
+    Write-Host "Set it with: `$env:GCP_PROJECT_ID = 'your-project-id'" -ForegroundColor Yellow
+    Write-Host "Or create a .env file from .env.example" -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Sales Intelligence System - Phase 1 Setup" -ForegroundColor Cyan
