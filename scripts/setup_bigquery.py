@@ -26,15 +26,15 @@ class BigQuerySchemaManager:
     Manager for creating and managing BigQuery tables and schemas.
     """
     
-    def __init__(self, project_id: Optional[str] = None, dataset_id: str = "sales_intelligence_dev"):
+    def __init__(self, project_id: Optional[str] = None, dataset_id: str = "sales_intelligence"):
         """
         Initialize BigQuery schema manager.
         
         Args:
-            project_id: GCP project ID. If not provided, uses environment or metadata.
-            dataset_id: BigQuery dataset ID (default: sales_intelligence_dev)
+            project_id: GCP project ID. If not provided, uses environment or defaults.
+            dataset_id: BigQuery dataset ID (default: sales_intelligence)
         """
-        self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
+        self.project_id = project_id or os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
         if not self.project_id:
             raise ValueError("GCP project ID is required. Set GCP_PROJECT_ID environment variable.")
         
@@ -156,7 +156,7 @@ class BigQuerySchemaManager:
         ]
 
 
-def setup_all_tables(project_id: Optional[str] = None, dataset_id: str = "sales_intelligence_dev") -> Dict[str, Any]:
+def setup_all_tables(project_id: Optional[str] = None, dataset_id: str = "sales_intelligence") -> Dict[str, Any]:
     """
     Set up all BigQuery tables for the sales intelligence system.
     
@@ -283,13 +283,19 @@ def main():
     """
     logging.basicConfig(level=logging.INFO)
     
+    # Get project ID from environment or use default
+    project_id = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
+    dataset_id = os.getenv("BIGQUERY_DATASET", "sales_intelligence")
+    
     print("=" * 60)
     print("Setting up BigQuery Tables for Sales Intelligence")
     print("=" * 60)
+    print(f"Project: {project_id}")
+    print(f"Dataset: {dataset_id}")
     
     # Set up all tables
     print("\nCreating tables...")
-    tables = setup_all_tables()
+    tables = setup_all_tables(project_id=project_id, dataset_id=dataset_id)
     
     for table_name, info in tables.items():
         status = info.get("status", "unknown")
