@@ -23,7 +23,7 @@ gcloud functions deploy gmail-sync \
   --runtime=python311 \
   --region=$REGION \
   --source=. \
-  --entry-point=cloud_functions.gmail_sync.main.gmail_sync \
+  --entry-point=gmail_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
   --memory=512MB \
@@ -40,7 +40,7 @@ gcloud functions deploy salesforce-sync \
   --runtime=python311 \
   --region=$REGION \
   --source=. \
-  --entry-point=cloud_functions.salesforce_sync.main.salesforce_sync \
+  --entry-point=salesforce_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
   --memory=512MB \
@@ -57,7 +57,7 @@ gcloud functions deploy dialpad-sync \
   --runtime=python311 \
   --region=$REGION \
   --source=. \
-  --entry-point=cloud_functions.dialpad_sync.main.dialpad_sync \
+  --entry-point=dialpad_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
   --memory=512MB \
@@ -74,7 +74,7 @@ gcloud functions deploy hubspot-sync \
   --runtime=python311 \
   --region=$REGION \
   --source=. \
-  --entry-point=cloud_functions.hubspot_sync.main.hubspot_sync \
+  --entry-point=hubspot_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
   --memory=512MB \
@@ -91,7 +91,7 @@ gcloud functions deploy entity-resolution \
   --runtime=python311 \
   --region=$REGION \
   --source=. \
-  --entry-point=cloud_functions.entity_resolution.main.entity_resolution \
+  --entry-point=entity_resolution \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
   --memory=512MB \

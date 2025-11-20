@@ -138,27 +138,27 @@ fi
 echo ""
 
 # Deploy Gmail Sync Function
-if ! deploy_function "gmail-sync" "cloud_functions.gmail_sync.main.gmail_sync"; then
+if ! deploy_function "gmail-sync" "gmail_sync"; then
     echo "⚠ Gmail sync deployment failed, continuing with other functions..."
 fi
 
 # Deploy Salesforce Sync Function
-if ! deploy_function "salesforce-sync" "cloud_functions.salesforce_sync.main.salesforce_sync"; then
+if ! deploy_function "salesforce-sync" "salesforce_sync"; then
     echo "⚠ Salesforce sync deployment failed, continuing with other functions..."
 fi
 
 # Deploy Dialpad Sync Function
-if ! deploy_function "dialpad-sync" "cloud_functions.dialpad_sync.main.dialpad_sync"; then
+if ! deploy_function "dialpad-sync" "dialpad_sync"; then
     echo "⚠ Dialpad sync deployment failed, continuing with other functions..."
 fi
 
 # Deploy HubSpot Sync Function
-if ! deploy_function "hubspot-sync" "cloud_functions.hubspot_sync.main.hubspot_sync"; then
+if ! deploy_function "hubspot-sync" "hubspot_sync"; then
     echo "⚠ HubSpot sync deployment failed, continuing with other functions..."
 fi
 
 # Deploy Entity Resolution Function
-if ! deploy_function "entity-resolution" "cloud_functions.entity_resolution.main.entity_resolution"; then
+if ! deploy_function "entity-resolution" "entity_resolution"; then
     echo "⚠ Entity resolution deployment failed"
 fi
 
