@@ -45,60 +45,82 @@ These credentials should already be available from Phase 1:
 
 ## 🆕 NEW Credentials Required for Milestone 2
 
-### 1. LLM Provider API Keys (Choose One or Multiple)
+### 1. LLM Provider - Google Vertex AI (Recommended ✅)
 
 **Required for:** Account Scoring, Natural Language Queries, AI Email Replies
 
-#### Option A: Anthropic Claude (Recommended)
-- **API Key:** `sk-ant-...` (Anthropic API Key)
-- **Model:** `claude-3-5-sonnet-20241022` (default)
-- **Source:** Anthropic Console → API Keys → Create Key
-- **Cost:** Pay-per-use (estimate: $3-15 per 1M input tokens)
-- **Usage:** LLM for account scoring, NLP queries, email replies
-- **Secret Name:** `anthropic-api-key`
+**✅ Decision: Using Google Vertex AI** - No additional API keys needed!
 
-#### Option B: OpenAI GPT-4
-- **API Key:** `sk-...` (OpenAI API Key)
-- **Organization ID:** (optional)
-- **Model:** `gpt-4` or `gpt-4-turbo-preview`
-- **Source:** OpenAI Platform → API Keys → Create Key
-- **Cost:** Pay-per-use (estimate: $30-60 per 1M tokens)
-- **Usage:** LLM for account scoring, NLP queries, email replies
-- **Secret Name:** `openai-api-key`
+#### Why Vertex AI?
+- ✅ Already integrated with GCP (same project, same service account)
+- ✅ No additional API keys required
+- ✅ Simplified credential management
+- ✅ Native GCP integration with BigQuery, monitoring, and billing
+- ✅ Cost-effective pricing
+- ✅ Uses existing GCP authentication
 
-#### Option C: Google Vertex AI
-- **Project ID:** (same as GCP project)
-- **Region:** `us-central1`
-- **Service Account:** (same as existing service account)
-- **Model:** Vertex AI Gemini or PaLM models
-- **Source:** GCP Vertex AI API (no additional key needed if using GCP service account)
-- **Cost:** Pay-per-use (estimate: $2-10 per 1M tokens)
-- **Usage:** LLM for account scoring, NLP queries, email replies
-- **Note:** Requires Vertex AI API enabled in GCP project
+#### Setup Required:
+- **Enable Vertex AI API:** Enable the Vertex AI API in GCP Console
+- **Service Account Role:** Ensure service account has `Vertex AI User` role (already configured)
+- **Project ID:** `maharani-sales-hub-11-2025` (already have)
+- **Region:** `us-central1` (already configured)
+- **Model:** Vertex AI Gemini (`gemini-pro`) or PaLM (`text-bison@001`)
+
+#### Cost:
+- **Pay-per-use:** ~$2-10 per 1M tokens (competitive pricing)
+- **Account Scoring:** ~$0.50-2.00 per 100 accounts (daily)
+- **NLP Queries:** ~$0.10-0.50 per query
+- **Email Replies:** ~$0.05-0.20 per email
+- **Monthly Estimate:** $50-300 (depends on volume)
 
 ---
 
-### 2. Embeddings Provider API Key
+#### Alternative Options (Not Recommended - Only if Needed)
+
+**Option B: Anthropic Claude** (if Vertex AI doesn't meet requirements)
+- **API Key:** `sk-ant-...` (Anthropic API Key)
+- **Model:** `claude-3-5-sonnet-20241022`
+- **Source:** Anthropic Console → API Keys
+- **Cost:** ~$3-15 per 1M tokens
+- **Secret Name:** `anthropic-api-key`
+
+**Option C: OpenAI GPT-4** (if Vertex AI doesn't meet requirements)
+- **API Key:** `sk-...` (OpenAI API Key)
+- **Model:** `gpt-4-turbo-preview` or `gpt-4`
+- **Source:** OpenAI Platform → API Keys
+- **Cost:** ~$30-60 per 1M tokens
+- **Secret Name:** `openai-api-key`
+
+---
+
+### 2. Embeddings Provider - Google Vertex AI (Recommended ✅)
 
 **Required for:** Vector embeddings generation for semantic search
 
-#### Option A: OpenAI Embeddings (Recommended)
-- **API Key:** `sk-...` (OpenAI API Key - can be same as LLM key)
-- **Model:** `text-embedding-3-small` (default)
+**✅ Decision: Using Google Vertex AI Embeddings** - No additional API keys needed!
+
+#### Setup Required:
+- **Vertex AI API:** Already enabled (same as LLM)
+- **Model:** Vertex AI `textembedding-gecko@001` or similar
+- **Service Account:** Same as existing (no additional setup)
+- **No API Key:** Uses GCP service account authentication
+
+#### Cost:
+- **Pay-per-use:** Competitive pricing
+- **Embedding Generation:** ~$0.10-0.50 per 1,000 emails/calls
+- **One-time Historical Data:** $10-50 (depending on volume)
+- **Incremental Updates:** Minimal cost
+
+---
+
+#### Alternative Option (Not Recommended)
+
+**Option B: OpenAI Embeddings** (if Vertex AI embeddings don't meet requirements)
+- **API Key:** `sk-...` (OpenAI API Key)
+- **Model:** `text-embedding-3-small`
 - **Source:** OpenAI Platform → API Keys
-- **Cost:** $0.020 per 1M tokens (very affordable)
-- **Usage:** Generate vector embeddings for emails and call transcripts
-- **Secret Name:** `openai-api-key` (reuse same key)
-
-#### Option B: Google Vertex AI Embeddings
-- **Project ID:** (same as GCP project)
-- **Model:** Vertex AI text-embedding models
-- **Source:** GCP Vertex AI API (no additional key needed)
-- **Cost:** Pay-per-use
-- **Usage:** Generate vector embeddings
-- **Note:** Requires Vertex AI API enabled
-
-**Note:** Embedding provider can be different from LLM provider (e.g., use OpenAI for embeddings, Anthropic for LLM)
+- **Cost:** $0.020 per 1M tokens
+- **Secret Name:** `openai-api-key`
 
 ---
 
@@ -107,22 +129,19 @@ These credentials should already be available from Phase 1:
 **Required for:** System configuration and customization
 
 #### LLM Provider Selection
-- **Question:** Which LLM provider would you like to use?
-  - Anthropic Claude (recommended - best for business use cases)
-  - OpenAI GPT-4 (more expensive but very capable)
-  - Vertex AI (integrated with GCP, no additional cost for API key)
-- **Default:** Anthropic Claude
+- **✅ Decision:** Google Vertex AI (Selected)
+- **Rationale:** Integrated with GCP, no additional API keys, simplified management
+- **Alternative Options:** Available if needed (Anthropic, OpenAI)
 
 #### LLM Model Selection
-- **Question:** Which model version?
-  - Anthropic: `claude-3-5-sonnet-20241022` (recommended)
-  - OpenAI: `gpt-4-turbo-preview` or `gpt-4`
-  - Vertex AI: `gemini-pro` or `text-bison@001`
+- **✅ Default:** Vertex AI `gemini-pro` (recommended)
+- **Alternative:** `text-bison@001` (if Gemini not available in region)
+- **Note:** Model will be configured during implementation
 
 #### Embedding Model Selection
-- **Question:** Which embedding model?
-  - OpenAI: `text-embedding-3-small` (recommended) or `text-embedding-3-large`
-  - Vertex AI: `textembedding-gecko@001`
+- **✅ Default:** Vertex AI `textembedding-gecko@001` (recommended)
+- **Alternative:** Other Vertex AI embedding models as available
+- **Note:** Model will be configured during implementation
 
 #### Business Rules & Preferences
 - **Account Scoring Criteria:** What factors should influence account scoring?
@@ -196,17 +215,15 @@ These credentials should already be available from Phase 1:
 
 ### From Client (New Requirements)
 
-#### LLM Provider (Choose One)
-- [ ] **Anthropic API Key** (`anthropic-api-key`)
-  - OR
-- [ ] **OpenAI API Key** (`openai-api-key`)
-  - OR
-- [ ] **Vertex AI enabled** (no key needed if using GCP service account)
+#### ✅ Vertex AI Setup (Selected - Primary)
+- [ ] **Enable Vertex AI API** in GCP Console
+- [ ] **Verify service account** has Vertex AI User role (already configured)
+- [ ] **Confirm region** supports Vertex AI models (`us-central1`)
+- [ ] **No API keys needed** - uses existing GCP service account
 
-#### Embeddings Provider
-- [ ] **OpenAI API Key** (`openai-api-key` - can reuse LLM key)
-  - OR
-- [ ] **Vertex AI enabled** (no key needed)
+#### Alternative Options (Not Required - Only if Needed)
+- [ ] **Anthropic API Key** (`anthropic-api-key`) - Only if Vertex AI doesn't work
+- [ ] **OpenAI API Key** (`openai-api-key`) - Only if Vertex AI doesn't work
 
 #### Configuration Decisions
 - [ ] **LLM Provider Selection:** Anthropic / OpenAI / Vertex AI
@@ -224,18 +241,59 @@ These credentials should already be available from Phase 1:
 
 ---
 
-## 🔐 Secret Manager Setup Commands
+## 🔐 Vertex AI Setup Commands
 
-Once you receive the credentials, add them to Secret Manager:
+Since we're using Vertex AI, no API keys need to be added to Secret Manager. Just enable the API:
 
 ### PowerShell
 ```powershell
 $projectId = "maharani-sales-hub-11-2025"
 
-# Anthropic API Key
+# Enable Vertex AI API
+gcloud services enable aiplatform.googleapis.com --project=$projectId
+
+# Verify service account has Vertex AI User role (should already be set)
+gcloud projects get-iam-policy $projectId `
+  --flatten="bindings[].members" `
+  --filter="bindings.members:serviceAccount:sales-intel-poc-sa@$projectId.iam.gserviceaccount.com" `
+  --format="table(bindings.role)"
+
+# If not set, grant Vertex AI User role
+gcloud projects add-iam-policy-binding $projectId `
+  --member="serviceAccount:sales-intel-poc-sa@$projectId.iam.gserviceaccount.com" `
+  --role="roles/aiplatform.user"
+```
+
+### Bash
+```bash
+PROJECT_ID="maharani-sales-hub-11-2025"
+
+# Enable Vertex AI API
+gcloud services enable aiplatform.googleapis.com --project=$PROJECT_ID
+
+# Verify service account has Vertex AI User role (should already be set)
+gcloud projects get-iam-policy $PROJECT_ID \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:serviceAccount:sales-intel-poc-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --format="table(bindings.role)"
+
+# If not set, grant Vertex AI User role
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:sales-intel-poc-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/aiplatform.user"
+```
+
+---
+
+### Alternative: Secret Manager Setup (Only if Using Anthropic/OpenAI)
+
+If for any reason Vertex AI doesn't meet requirements, use these commands:
+
+```powershell
+# Anthropic API Key (if needed)
 echo -n "YOUR_ANTHROPIC_API_KEY" | gcloud secrets versions add anthropic-api-key --data-file=- --project=$projectId
 
-# OpenAI API Key (if using)
+# OpenAI API Key (if needed)
 echo -n "YOUR_OPENAI_API_KEY" | gcloud secrets versions add openai-api-key --data-file=- --project=$projectId
 
 # Grant service account access
@@ -243,87 +301,77 @@ gcloud secrets add-iam-policy-binding anthropic-api-key `
   --member="serviceAccount:sales-intel-poc-sa@$projectId.iam.gserviceaccount.com" `
   --role="roles/secretmanager.secretAccessor" `
   --project=$projectId
-
-gcloud secrets add-iam-policy-binding openai-api-key `
-  --member="serviceAccount:sales-intel-poc-sa@$projectId.iam.gserviceaccount.com" `
-  --role="roles/secretmanager.secretAccessor" `
-  --project=$projectId
-```
-
-### Bash
-```bash
-PROJECT_ID="maharani-sales-hub-11-2025"
-
-# Anthropic API Key
-echo -n "YOUR_ANTHROPIC_API_KEY" | gcloud secrets versions add anthropic-api-key --data-file=- --project=$PROJECT_ID
-
-# OpenAI API Key (if using)
-echo -n "YOUR_OPENAI_API_KEY" | gcloud secrets versions add openai-api-key --data-file=- --project=$PROJECT_ID
-
-# Grant service account access
-gcloud secrets add-iam-policy-binding anthropic-api-key \
-  --member="serviceAccount:sales-intel-poc-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project=$PROJECT_ID
-
-gcloud secrets add-iam-policy-binding openai-api-key \
-  --member="serviceAccount:sales-intel-poc-sa@${PROJECT_ID}.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project=$PROJECT_ID
 ```
 
 ---
 
-## 💰 Cost Estimates
+## 💰 Cost Estimates - Vertex AI
 
-### Anthropic Claude
+### Vertex AI LLM (Gemini/PaLM)
 - **Account Scoring:** ~$0.50-2.00 per 100 accounts (daily)
 - **NLP Queries:** ~$0.10-0.50 per query
 - **Email Replies:** ~$0.05-0.20 per email
 - **Monthly Estimate:** $50-300 (depends on volume)
+- **API Key Cost:** $0 (uses existing GCP service account)
 
-### OpenAI GPT-4
-- **Account Scoring:** ~$2-8 per 100 accounts (daily)
-- **NLP Queries:** ~$0.30-1.50 per query
-- **Email Replies:** ~$0.15-0.60 per email
-- **Monthly Estimate:** $200-800 (depends on volume)
-
-### OpenAI Embeddings
+### Vertex AI Embeddings
 - **Embedding Generation:** ~$0.10-0.50 per 1,000 emails/calls
 - **One-time Historical Data:** $10-50 (depending on volume)
 - **Incremental Updates:** Minimal cost
+- **API Key Cost:** $0 (uses existing GCP service account)
 
-### Vertex AI
-- **Similar pricing to Anthropic**
-- **No additional API key costs** (uses GCP service account)
+### Total Monthly Estimate
+- **Minimum:** $50-100/month (light usage)
+- **Typical:** $100-200/month (moderate usage)
+- **Maximum:** $200-400/month (heavy usage)
 
-**Note:** Actual costs depend on usage volume. Start with test runs to estimate.
+**Note:** Actual costs depend on usage volume. All costs appear on GCP bill. Start with test runs to estimate.
 
 ---
 
-## 📧 How to Obtain Credentials
+## 📧 How to Set Up Vertex AI
 
-### Anthropic API Key
+### ✅ Vertex AI Setup (Primary Method)
+
+1. **Enable Vertex AI API:**
+   - Go to: [GCP Console → APIs & Services → Library](https://console.cloud.google.com/apis/library)
+   - Search for: "Vertex AI API"
+   - Click: "Enable"
+   - **OR** use command: `gcloud services enable aiplatform.googleapis.com --project=maharani-sales-hub-11-2025`
+
+2. **Verify Service Account Permissions:**
+   - Service account should already have `Vertex AI User` role
+   - If not, grant it via IAM or run the setup commands above
+
+3. **Verify Region Support:**
+   - Confirm `us-central1` supports Vertex AI models (it does)
+   - Models available: Gemini Pro, PaLM, text-bison
+
+4. **No API Key Needed:**
+   - Uses existing GCP service account authentication
+   - All requests authenticated via service account
+
+**That's it!** No external accounts or API keys needed.
+
+---
+
+### Alternative: External Providers (Only if Needed)
+
+If Vertex AI doesn't meet requirements, these alternatives are available:
+
+#### Anthropic API Key
 1. Go to: https://console.anthropic.com/
 2. Sign up or log in
-3. Navigate to: API Keys
-4. Click: "Create Key"
-5. Copy the key (starts with `sk-ant-`)
-6. **Note:** Key is shown only once, save it immediately
+3. Navigate to: API Keys → Create Key
+4. Copy the key (starts with `sk-ant-`)
+5. Add to Secret Manager (see commands above)
 
-### OpenAI API Key
+#### OpenAI API Key
 1. Go to: https://platform.openai.com/
 2. Sign up or log in
-3. Navigate to: API Keys
-4. Click: "Create new secret key"
-5. Copy the key (starts with `sk-`)
-6. **Note:** Key is shown only once, save it immediately
-
-### Vertex AI Setup
-1. Go to: GCP Console → Vertex AI
-2. Enable Vertex AI API (if not already enabled)
-3. Ensure service account has Vertex AI User role
-4. No API key needed (uses GCP authentication)
+3. Navigate to: API Keys → Create new secret key
+4. Copy the key (starts with `sk-`)
+5. Add to Secret Manager (see commands above)
 
 ---
 
@@ -339,14 +387,23 @@ gcloud secrets add-iam-policy-binding openai-api-key \
 
 ## ✅ Ready to Start Checklist
 
-- [ ] LLM provider selected (Anthropic/OpenAI/Vertex AI)
-- [ ] LLM API key obtained and added to Secret Manager
-- [ ] Embedding provider selected (OpenAI/Vertex AI)
-- [ ] Embedding API key obtained (if using OpenAI)
-- [ ] Business rules and preferences documented
-- [ ] Permissions verified (Salesforce, HubSpot, Gmail)
-- [ ] Configuration decisions made
-- [ ] Cost estimates reviewed and approved
+### Vertex AI Setup (Primary - Required)
+- [ ] **Vertex AI API enabled** in GCP Console
+- [ ] **Service account verified** has Vertex AI User role
+- [ ] **Region confirmed** supports Vertex AI (`us-central1` ✅)
+- [ ] **No API keys needed** - using existing GCP authentication
+
+### Configuration & Preferences (Required)
+- [ ] **Business rules documented** (account scoring criteria, lead creation rules)
+- [ ] **HubSpot enrollment rules** defined
+- [ ] **Email reply preferences** specified (tone, length, auto-send)
+- [ ] **Permissions verified** (Salesforce create leads, HubSpot enroll, Gmail send)
+
+### Optional (Only if Not Using Vertex AI)
+- [ ] Alternative LLM provider selected (Anthropic/OpenAI)
+- [ ] Alternative API key obtained and added to Secret Manager
+
+**Note:** With Vertex AI, the setup is much simpler - just enable the API and verify permissions!
 
 ---
 
@@ -361,6 +418,7 @@ gcloud secrets add-iam-policy-binding openai-api-key \
 ---
 
 **Last Updated:** November 2025  
-**Document Version:** 1.0  
+**Document Version:** 2.0  
+**Changes:** Updated to use Vertex AI as primary/recommended provider  
 **Status:** Ready for Client Review
 
