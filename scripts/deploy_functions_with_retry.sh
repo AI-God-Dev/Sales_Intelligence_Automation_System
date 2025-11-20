@@ -2,7 +2,7 @@
 # Deploy Cloud Functions with retry logic for 409 conflicts
 # IMPORTANT: Deploys from project root to include shared modules (utils, config, entity_resolution)
 
-set -e
+# Don't use set -e here, we need to handle errors manually for retries
 
 PROJECT_ID="${GCP_PROJECT_ID:-maharani-sales-hub-11-2025}"
 REGION="${GCP_REGION:-us-central1}"
@@ -24,11 +24,14 @@ deploy_function() {
     local function_name=$1
     local entry_point=$2
     local retry_count=0
+    local deploy_output
+    local exit_code
     
     while [ $retry_count -lt $MAX_RETRIES ]; do
         echo "Deploying $function_name (attempt $((retry_count + 1))/$MAX_RETRIES)..."
         
-        if gcloud functions deploy "$function_name" \
+        # Capture output and exit code
+        deploy_output=$(gcloud functions deploy "$function_name" \
             --gen2 \
             --runtime=python311 \
             --region=$REGION \
@@ -41,36 +44,66 @@ deploy_function() {
             --max-instances=10 \
             --min-instances=0 \
             --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" \
-            --project=$PROJECT_ID 2>&1; then
-            
+            --project=$PROJECT_ID 2>&1)
+        exit_code=$?
+        
+        if [ $exit_code -eq 0 ]; then
             echo "✓ Successfully deployed $function_name"
             return 0
         else
-            local exit_code=$?
-            if [ $exit_code -ne 0 ]; then
-                # Check if it's a 409 error
+            # Check if it's a 409 conflict error
+            if echo "$deploy_output" | grep -q "409\|unable to queue\|already exists"; then
+                echo "⚠ Conflict detected (409 error). Function may already exist or deployment in progress."
+                
+                # Check if function exists
                 if gcloud functions describe "$function_name" --region=$REGION --project=$PROJECT_ID --gen2 >/dev/null 2>&1; then
-                    echo "⚠ Function $function_name exists but deployment failed."
-                    echo "Checking if there's an active deployment..."
+                    echo "Function $function_name exists. Checking for active deployments..."
                     
                     # Wait for active builds to complete
-                    local active_builds=$(gcloud builds list --ongoing --project=$PROJECT_ID --region=$REGION --limit=1 --format="value(id)" 2>/dev/null | wc -l)
+                    local build_output
+                    build_output=$(gcloud builds list --ongoing --project=$PROJECT_ID --region=$REGION --limit=1 --format="value(id)" 2>/dev/null)
+                    local active_builds=$(echo "$build_output" | grep -v "^$" | wc -l)
+                    
                     if [ "$active_builds" -gt 0 ]; then
                         echo "Active deployment in progress. Waiting $RETRY_DELAY seconds..."
                         sleep $RETRY_DELAY
                         retry_count=$((retry_count + 1))
                         continue
                     else
-                        echo "⚠ No active builds found. Trying to continue with other functions..."
-                        return 1
+                        echo "⚠ No active builds found. This might be a temporary conflict."
+                        if [ $retry_count -lt $((MAX_RETRIES - 1)) ]; then
+                            echo "Waiting $RETRY_DELAY seconds before retry..."
+                            sleep $RETRY_DELAY
+                            retry_count=$((retry_count + 1))
+                            continue
+                        else
+                            echo "✗ Max retries reached for $function_name"
+                            return 1
+                        fi
                     fi
                 else
-                    echo "✗ Failed to deploy $function_name (exit code: $exit_code)"
+                    echo "⚠ Function doesn't exist but deployment failed."
                     if [ $retry_count -lt $((MAX_RETRIES - 1)) ]; then
                         echo "Waiting $RETRY_DELAY seconds before retry..."
                         sleep $RETRY_DELAY
+                        retry_count=$((retry_count + 1))
+                        continue
+                    else
+                        echo "✗ Failed to deploy $function_name after $MAX_RETRIES attempts"
+                        echo "Error output: $deploy_output"
+                        return 1
                     fi
+                fi
+            else
+                echo "✗ Failed to deploy $function_name (exit code: $exit_code)"
+                echo "Error: $deploy_output"
+                if [ $retry_count -lt $((MAX_RETRIES - 1)) ]; then
+                    echo "Waiting $RETRY_DELAY seconds before retry..."
+                    sleep $RETRY_DELAY
                     retry_count=$((retry_count + 1))
+                    continue
+                else
+                    return 1
                 fi
             fi
         fi
@@ -82,7 +115,8 @@ deploy_function() {
 
 # Check for active deployments first
 echo "Checking for active deployments..."
-ACTIVE_BUILDS=$(gcloud builds list --ongoing --project=$PROJECT_ID --region=$REGION --limit=1 --format="value(id)" 2>/dev/null | wc -l)
+build_list_output=$(gcloud builds list --ongoing --project=$PROJECT_ID --region=$REGION --limit=1 --format="value(id)" 2>/dev/null || true)
+ACTIVE_BUILDS=$(echo "$build_list_output" | grep -v "^$" | wc -l)
 
 if [ "$ACTIVE_BUILDS" -gt 0 ]; then
     echo "⚠ Warning: Active Cloud Build operations detected!"
