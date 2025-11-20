@@ -6,7 +6,8 @@ set -e
 
 PROJECT_ID="${GCP_PROJECT_ID:-maharani-sales-hub-11-2025}"
 REGION="${GCP_REGION:-us-central1}"
-SERVICE_ACCOUNT="sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+SERVICE_ACCOUNT_NAME="${GCP_SERVICE_ACCOUNT_NAME:-sales-intel-poc-sa}"
+SERVICE_ACCOUNT="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 echo "Deploying Cloud Functions to project: $PROJECT_ID"
 echo "Using service account: $SERVICE_ACCOUNT"

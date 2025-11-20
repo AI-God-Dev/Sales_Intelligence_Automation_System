@@ -79,7 +79,7 @@ resource "google_bigquery_dataset" "sales_intelligence" {
   }
 }
 
-# Note: Using existing service account sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com
+# Note: Using existing service account (sales-intel-poc-sa) referenced via data source
 # If you need to create a new one, uncomment below:
 # resource "google_service_account" "cloud_functions" {
 #   account_id   = "sales-intelligence-functions"
@@ -90,51 +90,51 @@ resource "google_bigquery_dataset" "sales_intelligence" {
 # Reference to existing service account
 data "google_service_account" "existing_sa" {
   account_id = "sales-intel-poc-sa"
-  project    = "maharani-sales-hub-11-2025"
+  project    = var.project_id
 }
 
 # IAM roles for existing service account
 resource "google_project_iam_member" "bigquery_user" {
   project = var.project_id
   role    = "roles/bigquery.dataEditor"
-  member  = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_project_iam_member" "secret_manager_accessor" {
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
-  member  = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_project_iam_member" "logging_writer" {
   project = var.project_id
   role    = "roles/logging.logWriter"
-  member  = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_project_iam_member" "monitoring_writer" {
   project = var.project_id
   role    = "roles/monitoring.metricWriter"
-  member  = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_project_iam_member" "cloud_functions_invoker" {
   project = var.project_id
   role    = "roles/cloudfunctions.invoker"
-  member  = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_project_iam_member" "run_invoker" {
   project = var.project_id
   role    = "roles/run.invoker"
-  member  = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 # Grant service account permission to impersonate itself (for Cloud Functions)
 resource "google_service_account_iam_member" "self_impersonation" {
   service_account_id = data.google_service_account.existing_sa.name
   role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member             = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 # Cloud Storage bucket for function source code

@@ -230,55 +230,55 @@ resource "google_pubsub_topic" "ingestion_errors" {
 resource "google_pubsub_topic_iam_member" "gmail_publisher" {
   topic  = google_pubsub_topic.gmail_ingestion.name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_pubsub_topic_iam_member" "salesforce_publisher" {
   topic  = google_pubsub_topic.salesforce_ingestion.name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_pubsub_topic_iam_member" "dialpad_publisher" {
   topic  = google_pubsub_topic.dialpad_ingestion.name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_pubsub_topic_iam_member" "hubspot_publisher" {
   topic  = google_pubsub_topic.hubspot_ingestion.name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_pubsub_topic_iam_member" "error_notification_publisher" {
   topic  = google_pubsub_topic.ingestion_errors.name
   role   = "roles/pubsub.publisher"
-  member = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 # Grant service account permissions to subscribe
 resource "google_pubsub_subscription_iam_member" "gmail_subscriber" {
   subscription = google_pubsub_subscription.gmail_ingestion_errors.name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member       = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_pubsub_subscription_iam_member" "salesforce_subscriber" {
   subscription = google_pubsub_subscription.salesforce_ingestion_errors.name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member       = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_pubsub_subscription_iam_member" "dialpad_subscriber" {
   subscription = google_pubsub_subscription.dialpad_ingestion_errors.name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member       = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
 resource "google_pubsub_subscription_iam_member" "hubspot_subscriber" {
   subscription = google_pubsub_subscription.hubspot_ingestion_errors.name
   role         = "roles/pubsub.subscriber"
-  member       = "serviceAccount:sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
+  member       = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 
