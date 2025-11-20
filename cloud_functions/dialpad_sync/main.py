@@ -2,16 +2,54 @@
 Dialpad Sync Cloud Function
 Extracts call logs and transcripts from Dialpad API
 """
-import functions_framework
+import sys
+import os
+from pathlib import Path
+
+# Add project root to Python path for imports
+_project_root = None
+_possible_roots = [
+    Path(__file__).parent.parent.parent,
+    Path.cwd(),
+    Path('/workspace'),
+    Path('/var/task'),
+]
+
+for root in _possible_roots:
+    if root.exists() and (root / 'utils').exists() and (root / 'config').exists():
+        _project_root = root
+        break
+
+if _project_root and str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+elif not _project_root:
+    _project_root = Path(__file__).parent.parent.parent
+    if str(_project_root) not in sys.path:
+        sys.path.insert(0, str(_project_root))
+
+# Initialize basic logging first
 import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+import functions_framework
 from datetime import datetime, timezone
 import requests
-from utils.bigquery_client import BigQueryClient
-from utils.logger import setup_logger
-from utils.phone_normalizer import normalize_phone
-from config.config import settings
 
-logger = setup_logger(__name__)
+# Import project modules (after path is set)
+try:
+    from utils.bigquery_client import BigQueryClient
+    from utils.logger import setup_logger
+    from utils.phone_normalizer import normalize_phone
+    from config.config import settings
+    logger = setup_logger(__name__)
+    logger.info("Successfully imported all required modules")
+except ImportError as e:
+    logger.error(f"Import error: {e}", exc_info=True)
+    raise ImportError(
+        f"Failed to import required modules. Error: {e}. "
+        f"Python path: {sys.path}. Project root: {_project_root}."
+    ) from e
 
 
 @functions_framework.http
