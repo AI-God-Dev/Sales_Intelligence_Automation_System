@@ -9,41 +9,116 @@ from pathlib import Path
 
 # Add project root to Python path for imports
 # This ensures utils, config, and entity_resolution modules are found
-_project_root = Path(__file__).parent.parent.parent
-if str(_project_root) not in sys.path:
+# Try multiple path resolution strategies for different deployment environments
+_project_root = None
+_possible_roots = [
+    Path(__file__).parent.parent.parent,  # From cloud_functions/gmail_sync/main.py -> project root
+    Path.cwd(),  # Current working directory
+    Path('/workspace'),  # Cloud Functions Gen2 default workspace
+    Path('/var/task'),  # Alternative Cloud Functions path
+]
+
+for root in _possible_roots:
+    if root.exists() and (root / 'utils').exists() and (root / 'config').exists():
+        _project_root = root
+        break
+
+if _project_root and str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
+elif not _project_root:
+    # Fallback: add current file's parent's parent's parent to path
+    _project_root = Path(__file__).parent.parent.parent
+    if str(_project_root) not in sys.path:
+        sys.path.insert(0, str(_project_root))
+
+# Initialize basic logging first (before any other imports that might fail)
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Log path information for debugging
+logger.info(f"Python path: {sys.path}")
+logger.info(f"Project root: {_project_root}")
+logger.info(f"Current working directory: {os.getcwd()}")
+logger.info(f"__file__ location: {__file__}")
+
+# Verify directory structure exists
+if _project_root and _project_root.exists():
+    logger.info(f"Project root exists: {_project_root}")
+    logger.info(f"Utils directory exists: {(_project_root / 'utils').exists()}")
+    logger.info(f"Config directory exists: {(_project_root / 'config').exists()}")
+    logger.info(f"Cloud functions directory exists: {(_project_root / 'cloud_functions').exists()}")
+    if (_project_root / 'utils').exists():
+        logger.info(f"Utils contents: {list((_project_root / 'utils').iterdir())}")
+    if (_project_root / 'config').exists():
+        logger.info(f"Config contents: {list((_project_root / 'config').iterdir())}")
+else:
+    logger.warning(f"Project root does not exist or is None: {_project_root}")
 
 import functions_framework
-import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 from google.cloud import bigquery
 from googleapiclient.discovery import build
 
 # Now import project modules (after path is set)
+# These imports are critical - if they fail, we can't proceed
 try:
+    logger.info("Attempting to import utils.bigquery_client...")
     from utils.bigquery_client import BigQueryClient
+    logger.info("Successfully imported BigQueryClient")
+    
+    logger.info("Attempting to import utils.logger...")
     from utils.logger import setup_logger
+    logger.info("Successfully imported setup_logger")
+    
+    logger.info("Attempting to import utils.monitoring...")
     from utils.monitoring import publish_error_notification
+    logger.info("Successfully imported publish_error_notification")
+    
+    logger.info("Attempting to import utils.validation...")
     from utils.validation import validate_email, validate_sync_type, ValidationError
+    logger.info("Successfully imported validation functions")
+    
+    logger.info("Attempting to import config.config...")
     from config.config import settings
+    logger.info("Successfully imported settings")
+    
+    logger.info("Attempting to import gmail_dwd...")
     from cloud_functions.gmail_sync.gmail_dwd import get_gmail_service_for_user
+    logger.info("Successfully imported get_gmail_service_for_user")
+    
+    # Reinitialize logger with proper setup after imports succeed
+    logger = setup_logger(__name__)
+    logger.info("Successfully imported all required modules")
 except ImportError as e:
-    # Log import errors but allow function to be registered
-    logging.error(f"Import error during module load: {e}")
-    logging.error(f"Python path: {sys.path}")
-    logging.error(f"Project root: {_project_root}")
-    # Define fallbacks if imports fail (will be caught at runtime)
-    BigQueryClient = None
-    setup_logger = logging.getLogger
-    publish_error_notification = lambda *args, **kwargs: None
-    ValidationError = Exception
-    validate_email = lambda x: x
-    validate_sync_type = lambda x: x
-    settings = None
-    get_gmail_service_for_user = None
-
-logger = setup_logger(__name__)
+    # Log import errors with full details
+    logger.error(f"Import error during module load: {e}", exc_info=True)
+    logger.error(f"Python path: {sys.path}")
+    logger.error(f"Project root: {_project_root}")
+    if _project_root and _project_root.exists():
+        try:
+            logger.error(f"Files in project root: {[f.name for f in _project_root.iterdir()]}")
+        except Exception as list_error:
+            logger.error(f"Could not list project root contents: {list_error}")
+    
+    # Try to provide helpful diagnostics
+    import importlib.util
+    failed_module = str(e).split("'")[1] if "'" in str(e) else "unknown"
+    logger.error(f"Failed to import module: {failed_module}")
+    
+    # Raise the error to fail fast - better than silent failures
+    raise ImportError(
+        f"Failed to import required modules during Cloud Function startup. "
+        f"Error: {e}. "
+        f"Python path: {sys.path}. "
+        f"Project root: {_project_root}. "
+        f"Please ensure all dependencies are installed and paths are correct. "
+        f"Check Cloud Run logs for more details."
+    ) from e
 
 
 @functions_framework.http
