@@ -405,15 +405,6 @@ If Vertex AI doesn't meet requirements, these alternatives are available:
 
 **Note:** With Vertex AI, the setup is much simpler - just enable the API and verify permissions!
 
----
-
-## 📞 Next Steps
-
-1. **Share this document with client**
-2. **Client provides credentials and preferences**
-3. **Add credentials to Secret Manager**
-4. **Configure system with business rules**
-5. **Begin Milestone 2 development**
 
 ---
 
