@@ -61,8 +61,11 @@ else:
 import functions_framework
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
+import time
+import random
 from google.cloud import bigquery
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # Now import project modules (after path is set)
 # These imports are critical - if they fail, we can't proceed
@@ -441,18 +444,105 @@ def _sync_messages(
 
 
 def _fetch_message_batch(service, message_ids: List[str]) -> List[Dict[str, Any]]:
-    """Fetch batch of messages from Gmail API."""
+    """
+    Fetch batch of messages from Gmail API with rate limiting and exponential backoff.
+    
+    Gmail API quota: 250 requests per minute per user
+    """
     messages = []
+    failed_ids = []
+    
     for msg_id in message_ids:
-        try:
-            msg = service.users().messages().get(
-                userId='me',
-                id=msg_id,
-                format='full'
-            ).execute()
-            messages.append(msg)
-        except Exception as e:
-            logger.error(f"Error fetching message {msg_id}: {e}")
+        max_retries = 5
+        retry_count = 0
+        base_delay = 1  # Start with 1 second delay
+        
+        while retry_count < max_retries:
+            try:
+                # Rate limiting: Gmail allows 250 requests/minute = ~4 requests/second
+                # Add small random delay to spread requests
+                time.sleep(0.25 + random.uniform(0, 0.1))
+                
+                msg = service.users().messages().get(
+                    userId='me',
+                    id=msg_id,
+                    format='full'
+                ).execute()
+                messages.append(msg)
+                break  # Success, move to next message
+                
+            except HttpError as e:
+                error_code = e.resp.status if hasattr(e, 'resp') else None
+                error_reason = None
+                
+                # Parse error details
+                if hasattr(e, 'error_details') and e.error_details:
+                    for detail in e.error_details:
+                        if detail.get('reason') == 'rateLimitExceeded':
+                            error_reason = 'rateLimitExceeded'
+                            break
+                
+                if error_code == 403 and error_reason == 'rateLimitExceeded':
+                    # Rate limit exceeded - exponential backoff with jitter
+                    if retry_count < max_retries - 1:
+                        delay = base_delay * (2 ** retry_count) + random.uniform(0, 1)
+                        logger.warning(
+                            f"Rate limit exceeded for message {msg_id}, "
+                            f"retrying in {delay:.2f}s (attempt {retry_count + 1}/{max_retries})"
+                        )
+                        time.sleep(delay)
+                        retry_count += 1
+                    else:
+                        logger.error(f"Rate limit exceeded for message {msg_id} after {max_retries} retries")
+                        failed_ids.append(msg_id)
+                        break
+                elif error_code == 404:
+                    # Message not found (might be deleted) - skip
+                    logger.warning(f"Message {msg_id} not found (might be deleted)")
+                    break
+                elif error_code == 403:
+                    # Other 403 errors (permission denied, etc.)
+                    logger.error(f"403 Forbidden for message {msg_id}: {e}")
+                    failed_ids.append(msg_id)
+                    break
+                else:
+                    # Other HTTP errors - retry with exponential backoff
+                    if retry_count < max_retries - 1:
+                        delay = base_delay * (2 ** retry_count) + random.uniform(0, 1)
+                        logger.warning(
+                            f"Error {error_code} fetching message {msg_id}, "
+                            f"retrying in {delay:.2f}s (attempt {retry_count + 1}/{max_retries})"
+                        )
+                        time.sleep(delay)
+                        retry_count += 1
+                    else:
+                        logger.error(f"Error fetching message {msg_id} after {max_retries} retries: {e}")
+                        failed_ids.append(msg_id)
+                        break
+                        
+            except Exception as e:
+                # Non-HTTP errors (network, timeout, etc.)
+                if retry_count < max_retries - 1:
+                    delay = base_delay * (2 ** retry_count) + random.uniform(0, 1)
+                    logger.warning(
+                        f"Error fetching message {msg_id}: {e}, "
+                        f"retrying in {delay:.2f}s (attempt {retry_count + 1}/{max_retries})"
+                    )
+                    time.sleep(delay)
+                    retry_count += 1
+                else:
+                    logger.error(f"Error fetching message {msg_id} after {max_retries} retries: {e}")
+                    failed_ids.append(msg_id)
+                    break
+        
+        # If we've been rate limited a lot, add extra delay to slow down
+        if len(messages) > 0 and len(messages) % 100 == 0:
+            logger.info(f"Fetched {len(messages)} messages so far, pausing briefly...")
+            time.sleep(2)  # Pause every 100 messages to avoid hitting limits
+    
+    if failed_ids:
+        logger.warning(f"Failed to fetch {len(failed_ids)} messages: {failed_ids[:10]}...")  # Log first 10
+    
     return messages
 
 
