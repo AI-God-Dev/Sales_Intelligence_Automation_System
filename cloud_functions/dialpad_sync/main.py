@@ -58,26 +58,44 @@ def dialpad_sync(request):
     Cloud Function entry point for Dialpad sync.
     
     Expected request parameters:
-    - user_id: Dialpad user ID to sync calls for
-    - sync_type: 'full' or 'incremental'
+    - user_id: (optional) Dialpad user ID to sync calls for. If not provided, syncs all users.
+    - sync_type: 'full' or 'incremental' (default: 'incremental')
     """
     try:
         request_json = request.get_json(silent=True) or {}
         user_id = request_json.get("user_id")
         sync_type = request_json.get("sync_type", "incremental")
         
-        if not user_id:
-            return {"error": "user_id required"}, 400
-        
         bq_client = BigQueryClient()
         started_at = datetime.now(timezone.utc).isoformat()
         
-        # Sync calls
-        calls_synced, errors = _sync_calls(
-            bq_client,
-            user_id,
-            sync_type
-        )
+        # If user_id not provided, fetch all users and sync all
+        if not user_id:
+            logger.info("No user_id provided. Fetching all users and syncing all calls...")
+            user_ids = _get_all_user_ids()
+            
+            if not user_ids:
+                return {"error": "No users found in Dialpad account"}, 400
+            
+            logger.info(f"Found {len(user_ids)} users. Syncing calls for all users...")
+            
+            total_calls_synced = 0
+            total_errors = 0
+            
+            for uid in user_ids:
+                try:
+                    calls_synced, errors = _sync_calls(bq_client, uid, sync_type)
+                    total_calls_synced += calls_synced
+                    total_errors += errors
+                except Exception as e:
+                    logger.error(f"Error syncing calls for user {uid}: {e}")
+                    total_errors += 1
+            
+            calls_synced = total_calls_synced
+            errors = total_errors
+        else:
+            # Sync for specific user
+            calls_synced, errors = _sync_calls(bq_client, user_id, sync_type)
         
         completed_at = datetime.now(timezone.utc).isoformat()
         status = "success" if errors == 0 else "partial" if calls_synced > 0 else "failed"
@@ -102,6 +120,58 @@ def dialpad_sync(request):
     except Exception as e:
         logger.error(f"Dialpad sync failed: {str(e)}", exc_info=True)
         return {"error": str(e)}, 500
+
+
+def _get_all_user_ids() -> list[str]:
+    """Fetch all Dialpad user IDs from API."""
+    api_key = settings.dialpad_api_key
+    base_url = "https://dialpad.com/api/v2"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    user_ids = []
+    page = 1
+    
+    try:
+        while True:
+            params = {
+                "page": page,
+                "per_page": 100
+            }
+            
+            response = requests.get(
+                f"{base_url}/users",
+                headers=headers,
+                params=params,
+                timeout=30
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            users = data.get("items", [])
+            if not users:
+                break
+            
+            for user in users:
+                user_id = user.get("id")
+                if user_id:
+                    user_ids.append(str(user_id))
+            
+            # Check if more pages
+            if not data.get("has_more", False):
+                break
+            
+            page += 1
+        
+        logger.info(f"Fetched {len(user_ids)} user IDs from Dialpad")
+        return user_ids
+    
+    except requests.RequestException as e:
+        logger.error(f"Error fetching users from Dialpad: {e}")
+        raise Exception(f"Failed to fetch Dialpad users: {e}") from e
 
 
 def _sync_calls(
