@@ -97,35 +97,66 @@ def _sync_sequences(api_client: HubSpot, bq_client: BigQueryClient) -> tuple[int
     errors = 0
     
     try:
-        # Fetch sequences from HubSpot API
-        # Note: HubSpot API structure may vary - adjust based on actual API
-        sequences_api = api_client.crm.sequences
+        # HubSpot sequences are accessed via Marketing API or direct REST API
+        # The SDK structure varies - use direct REST API for reliability
+        import requests
+        from config.config import settings
         
-        # Get all sequences
-        all_sequences = sequences_api.get_all()
+        url = "https://api.hubapi.com/marketing/v3/sequences"
+        headers = {
+            "Authorization": f"Bearer {settings.hubspot_api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        logger.info("Fetching sequences from HubSpot Marketing API...")
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+        sequences_data = response.json()
+        
+        # Parse sequences from response
+        sequences_list = []
+        if isinstance(sequences_data, dict):
+            # Paginated response format
+            if 'results' in sequences_data:
+                sequences_list = sequences_data['results']
+            # Direct list
+            elif isinstance(sequences_data.get('data'), list):
+                sequences_list = sequences_data['data']
+            # Single sequence
+            elif sequences_data.get('id'):
+                sequences_list = [sequences_data]
+        elif isinstance(sequences_data, list):
+            sequences_list = sequences_data
+        
+        logger.info(f"Found {len(sequences_list)} sequences in HubSpot")
         
         rows = []
-        for sequence in all_sequences.get("results", []):
+        for sequence in sequences_list:
             try:
                 row = {
-                    "sequence_id": sequence.get("id"),
-                    "sequence_name": sequence.get("name"),
-                    "is_active": sequence.get("enabled", False),
-                    "enrollment_count": sequence.get("contactCount", 0),
+                    "sequence_id": str(sequence.get("id") or sequence.get("sequenceId", "")),
+                    "sequence_name": sequence.get("name") or sequence.get("sequenceName", ""),
+                    "is_active": sequence.get("enabled", sequence.get("isActive", True)),
+                    "enrollment_count": sequence.get("contactCount", sequence.get("enrollmentCount", 0)),
                     "last_synced": datetime.now(timezone.utc).isoformat()
                 }
-                rows.append(row)
+                # Only add if we have at least an ID
+                if row["sequence_id"]:
+                    rows.append(row)
             except Exception as e:
-                logger.error(f"Error transforming sequence {sequence.get('id')}: {e}")
+                logger.error(f"Error transforming sequence {sequence.get('id', 'unknown')}: {e}")
                 errors += 1
         
         if rows:
             try:
                 bq_client.insert_rows("hubspot_sequences", rows)
                 sequences_synced = len(rows)
+                logger.info(f"Successfully inserted {sequences_synced} sequences into BigQuery")
             except Exception as e:
                 logger.error(f"Error inserting sequences: {e}")
                 errors += len(rows)
+        else:
+            logger.warning("No sequences to insert (empty or invalid data)")
         
         return sequences_synced, errors
         

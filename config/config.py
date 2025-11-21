@@ -58,30 +58,54 @@ class Settings(BaseSettings):
             raise Exception(error_msg) from e
     
     # API Credentials (loaded from Secret Manager)
+    # OAuth 2.0 (Preferred - more secure)
+    @property
+    def salesforce_client_id(self) -> str:
+        try:
+            return self.get_secret("salesforce-client-id")
+        except Exception:
+            raise Exception("Salesforce client ID not found in Secret Manager. Please set 'salesforce-client-id' secret.")
+    
+    @property
+    def salesforce_client_secret(self) -> str:
+        try:
+            return self.get_secret("salesforce-client-secret")
+        except Exception:
+            raise Exception("Salesforce client secret not found in Secret Manager. Please set 'salesforce-client-secret' secret.")
+    
+    @property
+    def salesforce_refresh_token(self) -> str:
+        try:
+            return self.get_secret("salesforce-refresh-token")
+        except Exception:
+            raise Exception("Salesforce refresh token not found in Secret Manager. Please set 'salesforce-refresh-token' secret.")
+    
+    @property
+    def salesforce_domain(self) -> str:
+        """Salesforce login domain: 'login' for production, 'test' for sandbox"""
+        return os.getenv("SALESFORCE_DOMAIN", "login")
+    
+    # Legacy username/password (fallback if OAuth not available)
     @property
     def salesforce_username(self) -> str:
         try:
             return self.get_secret("salesforce-username")
         except Exception:
-            raise Exception("Salesforce username not found in Secret Manager. Please set 'salesforce-username' secret.")
+            return ""  # Optional - only used if OAuth not available
     
     @property
     def salesforce_password(self) -> str:
         try:
             return self.get_secret("salesforce-password")
         except Exception:
-            raise Exception("Salesforce password not found in Secret Manager. Please set 'salesforce-password' secret.")
+            return ""  # Optional - only used if OAuth not available
     
     @property
     def salesforce_security_token(self) -> str:
         try:
             return self.get_secret("salesforce-security-token")
         except Exception:
-            raise Exception("Salesforce security token not found in Secret Manager. Please set 'salesforce-security-token' secret.")
-    
-    @property
-    def salesforce_domain(self) -> str:
-        return os.getenv("SALESFORCE_DOMAIN", "login")
+            return ""  # Optional - only used if OAuth not available
     
     @property
     def dialpad_api_key(self) -> str:

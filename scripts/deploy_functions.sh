@@ -36,6 +36,8 @@ gcloud functions deploy gmail-sync \
 
 # Deploy Salesforce Sync Function
 echo "Deploying Salesforce Sync Function..."
+# Set SALESFORCE_DOMAIN to "test" for sandbox, "login" for production
+SALESFORCE_DOMAIN="${SALESFORCE_DOMAIN:-test}"  # Default to sandbox
 gcloud functions deploy salesforce-sync \
   --gen2 \
   --runtime=python311 \
@@ -48,7 +50,7 @@ gcloud functions deploy salesforce-sync \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,SALESFORCE_DOMAIN=$SALESFORCE_DOMAIN" \
   --project=$PROJECT_ID
 
 # Deploy Dialpad Sync Function

@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 import functions_framework
 from datetime import datetime, timezone
 from simple_salesforce import Salesforce
+import requests
 
 # Import project modules (after path is set)
 try:
@@ -76,13 +77,8 @@ def salesforce_sync(request):
             logger.warning(f"Validation error: {e}")
             return {"error": str(e)}, 400
         
-        # Initialize Salesforce connection
-        sf = Salesforce(
-            username=settings.salesforce_username,
-            password=settings.salesforce_password,
-            security_token=settings.salesforce_security_token,
-            domain=settings.salesforce_domain
-        )
+        # Initialize Salesforce connection using OAuth 2.0 (preferred) or username/password (fallback)
+        sf = _get_salesforce_client(settings)
         
         bq_client = BigQueryClient()
         started_at = datetime.now(timezone.utc).isoformat()
@@ -131,6 +127,91 @@ def salesforce_sync(request):
             "message": "An unexpected error occurred during Salesforce sync. Please check logs for details.",
             "status_code": 500
         }, 500
+
+
+def _get_salesforce_client(settings) -> Salesforce:
+    """
+    Get Salesforce client using OAuth 2.0 (preferred) or username/password (fallback).
+    
+    OAuth 2.0 uses: Client ID, Client Secret, Refresh Token
+    Username/password uses: Username, Password, Security Token
+    """
+    try:
+        # Try OAuth 2.0 first (more secure)
+        client_id = settings.salesforce_client_id
+        client_secret = settings.salesforce_client_secret
+        refresh_token = settings.salesforce_refresh_token
+        domain = settings.salesforce_domain  # 'login' or 'test'
+        
+        if client_id and client_secret and refresh_token:
+            logger.info("Using OAuth 2.0 authentication for Salesforce")
+            return _authenticate_with_oauth(client_id, client_secret, refresh_token, domain)
+        
+        # Fallback to username/password if OAuth not available
+        logger.info("Using username/password authentication for Salesforce (OAuth not configured)")
+        username = settings.salesforce_username or ""
+        password = settings.salesforce_password or ""
+        security_token = settings.salesforce_security_token or ""
+        
+        if not username or not password:
+            raise Exception("Neither OAuth credentials (client_id, client_secret, refresh_token) nor username/password are configured. Please set secrets in Secret Manager.")
+        
+        return Salesforce(
+            username=username,
+            password=password,
+            security_token=security_token,
+            domain=domain
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to authenticate with Salesforce: {e}", exc_info=True)
+        raise
+
+
+def _authenticate_with_oauth(client_id: str, client_secret: str, refresh_token: str, domain: str) -> Salesforce:
+    """
+    Authenticate with Salesforce using OAuth 2.0 refresh token flow.
+    
+    Args:
+        client_id: Salesforce Connected App Consumer Key
+        client_secret: Salesforce Connected App Consumer Secret
+        refresh_token: OAuth 2.0 refresh token
+        domain: 'login' for production, 'test' for sandbox
+    
+    Returns:
+        Authenticated Salesforce client instance
+    """
+    # Determine token URL based on domain
+    if domain == "test":
+        token_url = "https://test.salesforce.com/services/oauth2/token"
+    else:
+        token_url = "https://login.salesforce.com/services/oauth2/token"
+    
+    # Exchange refresh token for access token
+    token_data = {
+        "grant_type": "refresh_token",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token
+    }
+    
+    response = requests.post(token_url, data=token_data, timeout=30)
+    response.raise_for_status()
+    
+    token_response = response.json()
+    access_token = token_response["access_token"]
+    instance_url = token_response["instance_url"]
+    
+    logger.info(f"Successfully authenticated with Salesforce OAuth. Instance: {instance_url}")
+    
+    # Create Salesforce client with access token and instance URL
+    # simple_salesforce supports session_id (access token) and instance_url
+    sf = Salesforce(
+        instance_url=instance_url,
+        session_id=access_token
+    )
+    
+    return sf
 
 
 def _sync_salesforce_object(
