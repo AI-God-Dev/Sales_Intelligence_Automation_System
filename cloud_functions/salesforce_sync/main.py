@@ -214,6 +214,43 @@ def _authenticate_with_oauth(client_id: str, client_secret: str, refresh_token: 
     return sf
 
 
+def _get_available_fields(sf: Salesforce, object_type: str, desired_fields: list[str]) -> str:
+    """
+    Get available fields from Salesforce object, filtering out fields that don't exist.
+    
+    Args:
+        sf: Salesforce client
+        object_type: Salesforce object type (e.g., "Account")
+        desired_fields: List of field names to check
+        
+    Returns:
+        Comma-separated string of available fields
+    """
+    try:
+        # Describe the object to get all available fields
+        describe_result = sf.restful(f"sobjects/{object_type}/describe/")
+        available_field_names = {field["name"] for field in describe_result["fields"]}
+        
+        # Filter desired fields to only those that exist
+        valid_fields = [f for f in desired_fields if f in available_field_names]
+        
+        if not valid_fields:
+            logger.warning(f"No valid fields found for {object_type}. Available fields: {list(available_field_names)[:10]}...")
+            # Fall back to just Id if nothing else is available
+            return "Id"
+        
+        logger.info(f"Found {len(valid_fields)}/{len(desired_fields)} valid fields for {object_type}")
+        missing_fields = set(desired_fields) - set(valid_fields)
+        if missing_fields:
+            logger.info(f"Missing fields (will be skipped): {missing_fields}")
+        
+        return ", ".join(valid_fields)
+    except Exception as e:
+        logger.warning(f"Error describing {object_type} fields, using all desired fields: {e}")
+        # Fallback: return all desired fields (will fail if any don't exist)
+        return ", ".join(desired_fields)
+
+
 def _sync_salesforce_object(
     sf: Salesforce,
     bq_client: BigQueryClient,
@@ -228,28 +265,28 @@ def _sync_salesforce_object(
     object_mappings = {
         "Account": {
             "table": "sf_accounts",
-            "fields": "Id, Name, Website, Industry, AnnualRevenue, OwnerId, CreatedDate, LastModifiedDate"
+            "fields_list": ["Id", "Name", "Website", "Industry", "AnnualRevenue", "OwnerId", "CreatedDate", "LastModifiedDate"]
         },
         "Contact": {
             "table": "sf_contacts",
-            "fields": "Id, AccountId, FirstName, LastName, Email, Phone, MobilePhone, Title, CreatedDate, LastModifiedDate"
+            "fields_list": ["Id", "AccountId", "FirstName", "LastName", "Email", "Phone", "MobilePhone", "Title", "CreatedDate", "LastModifiedDate"]
         },
         "Lead": {
             "table": "sf_leads",
-            "fields": "Id, FirstName, LastName, Email, Company, Phone, Title, LeadSource, Status, OwnerId, CreatedDate, LastModifiedDate"
+            "fields_list": ["Id", "FirstName", "LastName", "Email", "Company", "Phone", "Title", "LeadSource", "Status", "OwnerId", "CreatedDate", "LastModifiedDate"]
         },
         "Opportunity": {
             "table": "sf_opportunities",
-            "fields": "Id, AccountId, Name, StageName, Amount, CloseDate, Probability, OwnerId, IsClosed, IsWon, CreatedDate, LastModifiedDate"
+            "fields_list": ["Id", "AccountId", "Name", "StageName", "Amount", "CloseDate", "Probability", "OwnerId", "IsClosed", "IsWon", "CreatedDate", "LastModifiedDate"]
         },
         "Task": {
             "table": "sf_activities",
-            "fields": "Id, WhatId, WhoId, Subject, Description, ActivityDate, OwnerId, CreatedDate, LastModifiedDate",
+            "fields_list": ["Id", "WhatId", "WhoId", "Subject", "Description", "ActivityDate", "OwnerId", "CreatedDate", "LastModifiedDate"],
             "activity_type": "Task"
         },
         "Event": {
             "table": "sf_activities",
-            "fields": "Id, WhatId, WhoId, Subject, Description, ActivityDate, OwnerId, CreatedDate, LastModifiedDate",
+            "fields_list": ["Id", "WhatId", "WhoId", "Subject", "Description", "ActivityDate", "OwnerId", "CreatedDate", "LastModifiedDate"],
             "activity_type": "Event"
         }
     }
@@ -259,8 +296,12 @@ def _sync_salesforce_object(
     
     mapping = object_mappings[object_type]
     
+    # Get available fields dynamically (filters out non-existent fields)
+    fields_str = _get_available_fields(sf, object_type, mapping["fields_list"])
+    mapping["fields"] = fields_str  # Store for transform function
+    
     # Build SOQL query
-    query = f"SELECT {mapping['fields']} FROM {object_type}"
+    query = f"SELECT {fields_str} FROM {object_type}"
     
     # Add WHERE clause for incremental sync
     if sync_type == "incremental":
