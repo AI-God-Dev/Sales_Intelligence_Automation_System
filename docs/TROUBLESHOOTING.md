@@ -43,6 +43,42 @@
 2. Verify OAuth service account permissions
 3. Check function logs for errors
 
+#### 401 Unauthorized When Invoking Functions Manually
+
+**Symptoms**: `401 Unauthorized` error when calling Cloud Functions via HTTP/curl
+
+**Error Message**: `Your client does not have permission to the requested URL`
+
+**Cause**: Your user account doesn't have the `roles/cloudfunctions.invoker` role on the Cloud Functions
+
+**Solutions**:
+1. **Grant your user account invoker permission** (recommended for testing):
+   ```bash
+   # Run the permission grant script
+   bash scripts/grant_user_invoker_permission.sh
+   
+   # Or manually for each function:
+   gcloud functions add-iam-policy-binding FUNCTION_NAME \
+       --region=us-central1 \
+       --member="user:YOUR_EMAIL@example.com" \
+       --role="roles/cloudfunctions.invoker" \
+       --project=maharani-sales-hub-11-2025
+   ```
+
+2. **Use service account authentication** instead:
+   ```bash
+   # Use service account key
+   gcloud auth activate-service-account SERVICE_ACCOUNT_EMAIL \
+       --key-file=PATH_TO_KEY.json
+   ```
+
+3. **Use the trigger script** which handles authentication properly:
+   ```bash
+   bash scripts/trigger_manual_sync.sh
+   ```
+
+**Note**: Cloud Functions deployed with `--trigger-http` require authentication by default. Only accounts with the `roles/cloudfunctions.invoker` role can invoke them.
+
 ### BigQuery
 
 #### Permission Denied Errors
