@@ -109,14 +109,14 @@ class DialpadAPIClient:
                 "limit": limit
             }
             
-            if user_id:
-                params["user_id"] = user_id
             if start_time:
                 params["start_time"] = start_time
             if end_time:
                 params["end_time"] = end_time
             
-            response = self._make_request("GET", "/calls", params=params)
+            # Use /users/{user_id}/calls endpoint if user_id provided, otherwise /calls
+            endpoint = f"/users/{user_id}/calls" if user_id else "/calls"
+            response = self._make_request("GET", endpoint, params=params)
             
             calls = response.get("items", []) or response.get("calls", [])
             logger.info(f"Retrieved {len(calls)} call logs")

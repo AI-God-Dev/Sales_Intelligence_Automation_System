@@ -200,7 +200,6 @@ def _sync_calls(
     page = 1
     while True:
         params = {
-            "user_id": user_id,
             "page": page,
             "per_page": 100
         }
@@ -210,7 +209,7 @@ def _sync_calls(
         
         try:
             response = requests.get(
-                f"{base_url}/calls",
+                f"{base_url}/users/{user_id}/calls",
                 headers=headers,
                 params=params,
                 timeout=30
