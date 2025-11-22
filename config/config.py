@@ -51,7 +51,9 @@ class Settings(BaseSettings):
             
             name = f"projects/{self.gcp_project_id}/secrets/{secret_id}/versions/{version}"
             response = self._secret_client.access_secret_version(request={"name": name})
-            return response.payload.data.decode("UTF-8")
+            # Strip whitespace and newlines from secret value
+            secret_value = response.payload.data.decode("UTF-8").strip()
+            return secret_value
         except Exception as e:
             error_msg = f"Failed to retrieve secret '{secret_id}' from Secret Manager: {str(e)}"
             logger.error(error_msg)
@@ -117,8 +119,14 @@ class Settings(BaseSettings):
     @property
     def hubspot_api_key(self) -> str:
         try:
-            return self.get_secret("hubspot-api-key")
-        except Exception:
+            api_key = self.get_secret("hubspot-api-key")
+            # Check if API key is a placeholder
+            if not api_key or api_key.upper() in ["PLACEHOLDER", ""]:
+                raise Exception("HubSpot API key is set to PLACEHOLDER. Please update 'hubspot-api-key' secret with a valid HubSpot Private App access token (format: pat-[region]-[token]).")
+            return api_key
+        except Exception as e:
+            if "PLACEHOLDER" in str(e):
+                raise
             raise Exception("HubSpot API key not found in Secret Manager. Please set 'hubspot-api-key' secret.")
     
     @property

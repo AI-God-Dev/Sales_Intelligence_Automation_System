@@ -80,7 +80,7 @@ gcloud functions deploy hubspot-sync \
   --entry-point=hubspot_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
-  --memory=512MB \
+  --memory=1024MB \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
