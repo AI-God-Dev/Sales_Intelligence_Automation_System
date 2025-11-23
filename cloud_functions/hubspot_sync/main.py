@@ -97,32 +97,33 @@ def _sync_sequences(api_client: HubSpot, bq_client: BigQueryClient) -> tuple[int
     errors = 0
     
     try:
-        # HubSpot sequences are accessed via Marketing API or direct REST API
-        # The SDK structure varies - use direct REST API for reliability
+        # HubSpot sequences are accessed via Automation API v4
+        # Use /automation/v4/workflows endpoint (not /marketing/v3/sequences)
         import requests
         from config.config import settings
         
-        url = "https://api.hubapi.com/marketing/v3/sequences"
+        url = "https://api.hubapi.com/automation/v4/workflows"
         headers = {
             "Authorization": f"Bearer {settings.hubspot_api_key}",
             "Content-Type": "application/json"
         }
         
-        logger.info("Fetching sequences from HubSpot Marketing API...")
+        logger.info("Fetching sequences from HubSpot Automation API...")
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
         sequences_data = response.json()
         
         # Parse sequences from response
+        # Automation API v4 returns: {"results": [...], "paging": {...}}
         sequences_list = []
         if isinstance(sequences_data, dict):
-            # Paginated response format
+            # Automation API v4 paginated response format
             if 'results' in sequences_data:
                 sequences_list = sequences_data['results']
-            # Direct list
+            # Direct list (fallback)
             elif isinstance(sequences_data.get('data'), list):
                 sequences_list = sequences_data['data']
-            # Single sequence
+            # Single sequence (fallback)
             elif sequences_data.get('id'):
                 sequences_list = [sequences_data]
         elif isinstance(sequences_data, list):
@@ -133,11 +134,18 @@ def _sync_sequences(api_client: HubSpot, bq_client: BigQueryClient) -> tuple[int
         rows = []
         for sequence in sequences_list:
             try:
+                # Automation API v4 workflow format
+                # Filter for sequences only (workflow type = "DRIP_DELAY" or "SEQUENCE")
+                workflow_type = sequence.get("type", "").upper()
+                if workflow_type not in ["DRIP_DELAY", "SEQUENCE"]:
+                    # Skip non-sequence workflows
+                    continue
+                
                 row = {
-                    "sequence_id": str(sequence.get("id") or sequence.get("sequenceId", "")),
-                    "sequence_name": sequence.get("name") or sequence.get("sequenceName", ""),
-                    "is_active": sequence.get("enabled", sequence.get("isActive", True)),
-                    "enrollment_count": sequence.get("contactCount", sequence.get("enrollmentCount", 0)),
+                    "sequence_id": str(sequence.get("id") or sequence.get("workflowId", "")),
+                    "sequence_name": sequence.get("name") or sequence.get("workflowName", ""),
+                    "is_active": sequence.get("enabled", sequence.get("active", True)),
+                    "enrollment_count": sequence.get("contactCount", sequence.get("enrollmentCount", sequence.get("enrolledContacts", 0))),
                     "last_synced": datetime.now(timezone.utc).isoformat()
                 }
                 # Only add if we have at least an ID

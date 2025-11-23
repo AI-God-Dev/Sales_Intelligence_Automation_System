@@ -87,6 +87,14 @@ def dialpad_sync(request):
                     calls_synced, errors = _sync_calls(bq_client, uid, sync_type)
                     total_calls_synced += calls_synced
                     total_errors += errors
+                except requests.RequestException as e:
+                    # Handle API errors gracefully - skip users that can't be accessed
+                    if hasattr(e, 'response') and e.response is not None:
+                        if e.response.status_code in [404, 403]:
+                            logger.warning(f"Skipping user {uid}: {e.response.status_code} - {e}")
+                            continue
+                    logger.error(f"Error syncing calls for user {uid}: {e}")
+                    total_errors += 1
                 except Exception as e:
                     logger.error(f"Error syncing calls for user {uid}: {e}")
                     total_errors += 1
@@ -214,10 +222,17 @@ def _sync_calls(
                 params=params,
                 timeout=30
             )
+            
+            # Handle 404 - user might not have calls endpoint accessible
+            if response.status_code == 404:
+                logger.info(f"User {user_id} endpoint not found (404). User may not have calls or endpoint not accessible. Skipping...")
+                # Return 0 calls, 0 errors (not an error, just no data)
+                return 0, 0
+            
             response.raise_for_status()
             data = response.json()
             
-            calls = data.get("items", [])
+            calls = data.get("items", []) or data.get("calls", [])
             if not calls:
                 break
             
@@ -246,7 +261,16 @@ def _sync_calls(
             page += 1
             
         except requests.RequestException as e:
-            logger.error(f"Error fetching calls from Dialpad: {e}")
+            # Handle 404 errors gracefully - user might not have calls or endpoint not accessible
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code == 404:
+                    logger.warning(f"User {user_id} not found or has no calls endpoint (404). Skipping...")
+                    # Don't count 404 as an error, just skip this user
+                    break
+                elif e.response.status_code == 403:
+                    logger.warning(f"Access denied for user {user_id} (403). Skipping...")
+                    break
+            logger.error(f"Error fetching calls from Dialpad for user {user_id}: {e}")
             errors += 1
             break
     
