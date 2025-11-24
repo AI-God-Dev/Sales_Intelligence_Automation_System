@@ -14,6 +14,7 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 import requests
+from requests.exceptions import HTTPError, ConnectionError, Timeout
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
@@ -201,6 +202,8 @@ if BQ_AVAILABLE and st.session_state.bq_client is None:
         st.session_state.bq_client = BigQueryClient()
     except Exception as e:
         st.session_state.bq_client = None
+        # Store error message for display
+        st.session_state.bq_error = str(e)
 
 # Helper functions
 def get_function_url(function_name: str) -> str:
@@ -208,7 +211,7 @@ def get_function_url(function_name: str) -> str:
     return f"{FUNCTIONS_BASE_URL}/{function_name}"
 
 def call_function(function_name: str, data: Dict = None, method: str = "POST") -> Dict:
-    """Call a Cloud Function."""
+    """Call a Cloud Function with improved error handling."""
     url = get_function_url(function_name)
     try:
         if method == "GET":
@@ -217,18 +220,43 @@ def call_function(function_name: str, data: Dict = None, method: str = "POST") -
             response = requests.post(url, json=data or {}, timeout=60)
         response.raise_for_status()
         return response.json()
+    except HTTPError as e:
+        if e.response.status_code == 404:
+            return {
+                "error": f"Cloud Function '{function_name}' is not deployed yet. Please deploy it using the deployment scripts.",
+                "error_type": "not_deployed",
+                "suggestion": f"Deploy using: ./scripts/deploy_phase2_functions.sh"
+            }
+        else:
+            return {
+                "error": f"HTTP {e.response.status_code}: {str(e)}",
+                "error_type": "http_error"
+            }
+    except ConnectionError as e:
+        return {
+            "error": f"Cannot connect to Cloud Function '{function_name}'. It may not be deployed or the URL is incorrect.",
+            "error_type": "connection_error",
+            "suggestion": "Check if the function is deployed and the URL is correct."
+        }
+    except Timeout as e:
+        return {
+            "error": f"Request to '{function_name}' timed out. The function may be cold-starting or overloaded.",
+            "error_type": "timeout"
+        }
     except Exception as e:
-        st.error(f"Error calling {function_name}: {str(e)}")
-        return {"error": str(e)}
+        return {
+            "error": f"Error calling {function_name}: {str(e)}",
+            "error_type": "unknown"
+        }
 
 def query_bigquery(query: str, max_results: int = 100) -> List[Dict]:
-    """Query BigQuery directly."""
+    """Query BigQuery directly with improved error handling."""
     if not st.session_state.bq_client:
         return []
     try:
         return st.session_state.bq_client.query(query, max_results=max_results)
     except Exception as e:
-        st.error(f"BigQuery error: {str(e)}")
+        # Don't show error for missing client, it's handled at call site
         return []
 
 # Google OAuth authentication
@@ -360,6 +388,17 @@ if page == "Dashboard":
             st.warning(f"Could not load metrics: {str(e)}")
             total_accounts_count = high_priority_count = unmatched_count = opportunities_count = 0
     else:
+        # Show helpful message when BigQuery is not available
+        st.info("""
+        💡 **BigQuery Client Not Available**
+        
+        The app is running in demo mode. To enable full functionality:
+        1. Set up GCP credentials: `gcloud auth application-default login`
+        2. Ensure the service account has BigQuery access
+        3. Restart the application
+        
+        You can still explore the interface, but data will show as 0 until BigQuery is connected.
+        """)
         total_accounts_count = high_priority_count = unmatched_count = opportunities_count = 0
     
     # Professional metric cards
@@ -403,11 +442,31 @@ if page == "Dashboard":
     if st.button("Refresh Account Scores"):
         with st.spinner("Refreshing account scores..."):
             result = call_function("account-scoring", {})
-            if "error" not in result:
-                st.success(f"Scored {result.get('accounts_scored', 0)} accounts")
-                st.rerun()
+            if "error" in result:
+                error_type = result.get("error_type", "unknown")
+                if error_type == "not_deployed":
+                    st.warning(f"⚠️ {result['error']}")
+                    with st.expander("How to deploy Cloud Functions"):
+                        st.code("""
+# Deploy Phase 2 Functions including account-scoring:
+./scripts/deploy_phase2_functions.sh
+
+# Or deploy individually:
+gcloud functions deploy account-scoring \\
+  --gen2 --runtime=python311 --region=us-central1 \\
+  --source=./intelligence/scoring \\
+  --entry-point=account_scoring \\
+  --trigger-http \\
+  --service-account=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com \\
+  --project=maharani-sales-hub-11-2025
+                        """, language="bash")
+                    if "suggestion" in result:
+                        st.info(f"💡 {result['suggestion']}")
+                else:
+                    st.error(f"❌ {result['error']}")
             else:
-                st.error("Failed to refresh scores")
+                st.success(f"✅ Successfully scored {result.get('accounts_scored', 0)} accounts!")
+                st.rerun()
     
     # Display top accounts
     if st.session_state.bq_client:
@@ -436,7 +495,17 @@ if page == "Dashboard":
         except Exception as e:
             st.error(f"Error loading accounts: {str(e)}")
     else:
-        st.info("BigQuery client not available. Account scores are generated daily at 7 AM.")
+        st.info("""
+        💡 **BigQuery Client Not Available**
+        
+        Account scores are generated daily at 7 AM when the system is fully deployed.
+        To view scores, ensure:
+        1. BigQuery client is configured (GCP credentials)
+        2. Cloud Functions are deployed
+        3. Account scoring has run at least once
+        
+        For now, you can use the "Refresh Account Scores" button above once functions are deployed.
+        """)
 
 # Account Scoring Page
 elif page == "Account Scoring":

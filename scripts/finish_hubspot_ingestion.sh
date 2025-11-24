@@ -146,8 +146,3 @@ else
     echo "   gcloud functions describe hubspot-sync --region=$REGION --project=$PROJECT_ID"
     exit 1
 fi
-
-
-
-
-
