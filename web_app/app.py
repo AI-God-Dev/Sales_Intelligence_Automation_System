@@ -1,6 +1,7 @@
 """
-Sales Intelligence & Automation System - Enhanced Web Application
+Sales Intelligence & Automation System - Professional Web Application
 Streamlit-based web interface with Google OAuth and full BigQuery integration
+Refined UI with professional styling and enhanced user experience
 """
 import streamlit as st
 import sys
@@ -17,6 +18,145 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import pandas as pd
+
+# Inject custom CSS for professional styling
+def inject_custom_css():
+    """Inject professional custom CSS styling."""
+    css = """
+    <style>
+    /* Main styling improvements */
+    .main {
+        padding: 2rem 1rem;
+    }
+    
+    /* Professional header styling */
+    h1 {
+        color: #1f77b4;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 3px solid #1f77b4;
+    }
+    
+    h2 {
+        color: #2c3e50;
+        font-weight: 600;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+    }
+    
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        color: white;
+    }
+    
+    /* Metric cards enhancement */
+    [data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        background: linear-gradient(90deg, #1f77b4 0%, #2c5aa0 100%);
+        color: white;
+        border-radius: 6px;
+        padding: 0.5rem 1.5rem;
+        font-weight: 600;
+        border: none;
+        transition: all 0.3s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(90deg, #2c5aa0 0%, #1f77b4 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+    }
+    
+    /* Info boxes */
+    .stInfo {
+        background: #e7f3ff;
+        border-left: 4px solid #1f77b4;
+        border-radius: 4px;
+        padding: 1rem;
+    }
+    
+    .stSuccess {
+        background: #d4edda;
+        border-left: 4px solid #27ae60;
+        border-radius: 4px;
+        padding: 1rem;
+    }
+    
+    .stWarning {
+        background: #fff3cd;
+        border-left: 4px solid #f39c12;
+        border-radius: 4px;
+        padding: 1rem;
+    }
+    
+    .stError {
+        background: #f8d7da;
+        border-left: 4px solid #e74c3c;
+        border-radius: 4px;
+        padding: 1rem;
+    }
+    
+    /* Dataframe styling */
+    .dataframe {
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .dataframe thead {
+        background: #2c3e50;
+        color: white;
+    }
+    
+    /* Input fields */
+    .stTextInput > div > div > input {
+        border-radius: 6px;
+        border: 2px solid #dee2e6;
+        padding: 0.5rem;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #1f77b4;
+        outline: none;
+    }
+    
+    /* Professional card styling */
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #1f77b4;
+        margin-bottom: 1rem;
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Professional spacing */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
+
+# Inject CSS on page load
+inject_custom_css()
 
 # Try to import Google OAuth
 try:
@@ -106,8 +246,13 @@ def verify_google_token(token: str) -> Optional[str]:
     except ValueError:
         return None
 
-# Sidebar navigation
-st.sidebar.title("📊 Sales Intelligence")
+# Sidebar navigation with professional styling
+st.sidebar.markdown("""
+<div style='text-align: center; padding: 1rem 0;'>
+    <h1 style='color: white; font-size: 1.8rem; margin: 0;'>📊 Sales Intelligence</h1>
+    <p style='color: #ecf0f1; font-size: 0.9rem; margin: 0.5rem 0 0 0;'>AI-Powered Sales Automation</p>
+</div>
+""", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 # Authentication
@@ -137,8 +282,15 @@ else:
         st.rerun()
 
 if not st.session_state.authenticated:
-    st.title("Sales Intelligence & Automation System")
-    st.info("Please log in to access the dashboard.")
+    st.markdown("""
+    <div style='text-align: center; padding: 4rem 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 1rem;'>Sales Intelligence & Automation System</h1>
+        <p style='font-size: 1.2rem; color: #7f8c8d; margin-bottom: 2rem;'>
+            AI-Powered Sales Intelligence Platform
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.info("👆 Please log in using the sidebar to access the dashboard.")
     st.stop()
 
 # Navigation
@@ -157,7 +309,12 @@ page = st.sidebar.selectbox(
 
 # Dashboard Page
 if page == "Dashboard":
-    st.title("📊 Sales Intelligence Dashboard")
+    st.markdown("""
+    <div style='margin-bottom: 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>📊 Sales Intelligence Dashboard</h1>
+        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Real-time insights and metrics for your sales pipeline</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Get metrics from BigQuery
     if st.session_state.bq_client:
@@ -205,16 +362,38 @@ if page == "Dashboard":
     else:
         total_accounts_count = high_priority_count = unmatched_count = opportunities_count = 0
     
+    # Professional metric cards
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.metric("Total Accounts", total_accounts_count)
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>Total Accounts</div>
+            <div style='font-size: 2rem; font-weight: 700; color: #1f77b4;'>{total_accounts_count:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.metric("High Priority (Today)", high_priority_count)
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>High Priority</div>
+            <div style='font-size: 2rem; font-weight: 700; color: #27ae60;'>{high_priority_count:,}</div>
+            <div style='font-size: 0.8rem; color: #7f8c8d; margin-top: 0.25rem;'>Today</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col3:
-        st.metric("Unmatched Emails", unmatched_count)
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>Unmatched Emails</div>
+            <div style='font-size: 2rem; font-weight: 700; color: #f39c12;'>{unmatched_count:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col4:
-        st.metric("Open Opportunities", opportunities_count)
+        st.markdown(f"""
+        <div class='metric-card'>
+            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>Open Opportunities</div>
+            <div style='font-size: 2rem; font-weight: 700; color: #3498db;'>{opportunities_count:,}</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
     
@@ -261,15 +440,25 @@ if page == "Dashboard":
 
 # Account Scoring Page
 elif page == "Account Scoring":
-    st.title("🎯 Account Scoring")
+    st.markdown("""
+    <div style='margin-bottom: 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>🎯 Account Scoring</h1>
+        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>AI-powered account prioritization and scoring</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("""
-    Account scores are generated daily using AI analysis of:
-    - Recent email engagement
-    - Call activity and sentiment
-    - Open opportunities
-    - Recent activities
-    """)
+    <div style='background: #e7f3ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #1f77b4; margin-bottom: 2rem;'>
+        <h4 style='margin-top: 0; color: #2c3e50;'>Account Scoring Methodology</h4>
+        <p style='margin-bottom: 0.5rem;'>Account scores are generated daily using AI analysis of:</p>
+        <ul style='margin-bottom: 0;'>
+            <li><strong>Recent email engagement</strong> - Response rates and interaction patterns</li>
+            <li><strong>Call activity and sentiment</strong> - Call frequency and emotional signals</li>
+            <li><strong>Open opportunities</strong> - Pipeline health and deal progression</li>
+            <li><strong>Recent activities</strong> - Overall account activity and touchpoints</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
     
     if st.session_state.bq_client:
         # Score distribution
@@ -351,14 +540,25 @@ elif page == "Account Scoring":
 
 # Natural Language Query Page
 elif page == "Natural Language Query":
-    st.title("💬 Natural Language Query")
+    st.markdown("""
+    <div style='margin-bottom: 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>💬 Natural Language Query</h1>
+        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Ask questions about your sales data in plain English</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("""
-    Ask questions about your sales data in plain English. Examples:
-    - "Show me accounts with high engagement in the last week"
-    - "Which accounts are discussing budget for 2026?"
-    - "Find contacts who haven't been called in 30 days"
-    """)
+    <div style='background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;'>
+        <h4 style='margin-top: 0; color: #2c3e50;'>💡 Natural Language Query</h4>
+        <p>Ask questions about your sales data in plain English. The AI will convert your question into SQL and execute it.</p>
+        <p style='margin-bottom: 0.5rem;'><strong>Example Queries:</strong></p>
+        <ul style='margin-bottom: 0;'>
+            <li>"Show me accounts with high engagement in the last week"</li>
+            <li>"Which accounts are discussing budget for 2026?"</li>
+            <li>"Find contacts who haven't been called in 30 days"</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
     
     query = st.text_area("Enter your question:", height=100)
     
@@ -392,15 +592,25 @@ elif page == "Natural Language Query":
 
 # Semantic Search Page (NEW)
 elif page == "Semantic Search":
-    st.title("🔍 Semantic Search")
+    st.markdown("""
+    <div style='margin-bottom: 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>🔍 Semantic Search</h1>
+        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>AI-powered intent-based search across all communications</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("""
-    Find accounts, emails, or calls by intent using AI-powered semantic search.
-    Examples:
-    - "budget discussions for 2026"
-    - "renewal concerns"
-    - "pricing negotiations"
-    """)
+    <div style='background: #f0f9ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #3498db; margin-bottom: 2rem;'>
+        <h4 style='margin-top: 0; color: #2c3e50;'>🔍 AI-Powered Semantic Search</h4>
+        <p>Find accounts, emails, or calls by intent using advanced vector search technology. Search by meaning, not just keywords.</p>
+        <p style='margin-bottom: 0.5rem;'><strong>Example Searches:</strong></p>
+        <ul style='margin-bottom: 0;'>
+            <li>"budget discussions for 2026" - Find budget-related conversations</li>
+            <li>"renewal concerns" - Discover accounts worried about renewals</li>
+            <li>"pricing negotiations" - Locate pricing discussion threads</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
     
     search_query = st.text_input("Enter search query:")
     search_type = st.selectbox("Search Type", ["accounts", "emails", "calls"])
@@ -432,7 +642,12 @@ elif page == "Semantic Search":
 
 # Unmatched Emails Page
 elif page == "Unmatched Emails":
-    st.title("📧 Unmatched Emails")
+    st.markdown("""
+    <div style='margin-bottom: 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>📧 Unmatched Emails</h1>
+        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Create leads from emails with unknown contacts</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("""
     Emails from contacts not yet in Salesforce. Create leads from these emails.
@@ -508,7 +723,12 @@ elif page == "Unmatched Emails":
 
 # Account Details Page
 elif page == "Account Details":
-    st.title("🏢 Account Details")
+    st.markdown("""
+    <div style='margin-bottom: 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>🏢 Account Details</h1>
+        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Complete account information and interaction history</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     account_search = st.text_input("Search Account by ID or Name:")
     
@@ -633,7 +853,12 @@ elif page == "Account Details":
 
 # Email Threads Page
 elif page == "Email Threads":
-    st.title("📬 Email Threads")
+    st.markdown("""
+    <div style='margin-bottom: 2rem;'>
+        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>📬 Email Threads</h1>
+        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>View conversations and generate AI-powered replies</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     thread_search = st.text_input("Enter Thread ID or Email Address:")
     
@@ -698,8 +923,13 @@ elif page == "Email Threads":
         else:
             st.warning("BigQuery client not available")
 
-# Footer
+# Professional Footer
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Sales Intelligence System**")
-st.sidebar.markdown("Version 2.0 - Phase 2 & 3 Complete")
+st.sidebar.markdown("""
+<div style='text-align: center; padding: 1rem 0; color: #ecf0f1;'>
+    <p style='font-weight: 600; margin-bottom: 0.5rem;'>Sales Intelligence System</p>
+    <p style='font-size: 0.85rem; color: #95a5a6; margin: 0;'>Version 2.0</p>
+    <p style='font-size: 0.8rem; color: #7f8c8d; margin-top: 0.5rem;'>Phase 2 & 3 Complete</p>
+</div>
+""", unsafe_allow_html=True)
 
