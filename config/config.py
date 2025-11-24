@@ -80,7 +80,15 @@ class Settings(BaseSettings):
         try:
             return self.get_secret("salesforce-refresh-token")
         except Exception:
-            raise Exception("Salesforce refresh token not found in Secret Manager. Please set 'salesforce-refresh-token' secret.")
+            return ""  # Optional - only needed for refresh token flow
+    
+    @property
+    def salesforce_instance_url(self) -> str:
+        """Salesforce instance URL (e.g., https://dc0000000qzo7mag.lightning.force.com/)"""
+        try:
+            return self.get_secret("salesforce-instance-url")
+        except Exception:
+            return ""  # Optional - only needed for client credentials flow
     
     @property
     def salesforce_domain(self) -> str:
