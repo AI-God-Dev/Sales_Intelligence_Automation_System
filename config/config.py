@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     )
     
     # GCP Configuration
-    gcp_project_id: str = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
-    gcp_region: str = os.getenv("GCP_REGION", "us-central1")
+    gcp_project_id: str = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025").strip()
+    gcp_region: str = os.getenv("GCP_REGION", "us-central1").strip()
     bigquery_dataset: str = os.getenv("BIGQUERY_DATASET", "sales_intelligence")
     
     # Secret Manager client (instance variable)
@@ -46,10 +46,21 @@ class Settings(BaseSettings):
         logger = logging.getLogger(__name__)
         
         try:
+            # Ensure project ID is clean (remove any whitespace or extra content)
+            project_id = str(self.gcp_project_id).strip()
+            if not project_id or " " in project_id:
+                # Fallback to environment variable directly if project_id is malformed
+                project_id = os.getenv("GCP_PROJECT_ID", "").strip()
+                if not project_id:
+                    raise Exception(f"Invalid GCP_PROJECT_ID: '{self.gcp_project_id}'. Please set GCP_PROJECT_ID environment variable correctly.")
+            
             if self._secret_client is None:
+                # Initialize Secret Manager client with explicit project
                 self._secret_client = secretmanager.SecretManagerServiceClient()
             
-            name = f"projects/{self.gcp_project_id}/secrets/{secret_id}/versions/{version}"
+            # Construct secret name with clean project ID
+            name = f"projects/{project_id}/secrets/{secret_id}/versions/{version}"
+            logger.debug(f"Accessing secret: {name}")
             response = self._secret_client.access_secret_version(request={"name": name})
             # Strip whitespace and newlines from secret value
             secret_value = response.payload.data.decode("UTF-8").strip()
