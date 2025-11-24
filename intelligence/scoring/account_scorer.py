@@ -6,11 +6,18 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import uuid
-import anthropic
+from google.cloud import bigquery
 from google.cloud import aiplatform
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
+
+# Conditional import for Anthropic (only if needed)
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
 
 logger = setup_logger(__name__)
 
@@ -23,18 +30,30 @@ class AccountScorer:
         self.llm_model = settings.llm_model
         
         if settings.llm_provider == "anthropic":
+            if not ANTHROPIC_AVAILABLE:
+                raise ImportError("anthropic package not installed. Install with: pip install anthropic")
+            if not settings.anthropic_api_key:
+                raise ValueError("Anthropic API key not configured. Set 'anthropic-api-key' secret or use vertex_ai provider.")
             self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+            self.model = None
         elif settings.llm_provider == "vertex_ai":
-            aiplatform.init(project=settings.gcp_project_id)
-            from vertexai.generative_models import GenerativeModel
-            self.model = GenerativeModel(self.llm_model)
+            try:
+                aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
+                from vertexai.generative_models import GenerativeModel
+                self.model = GenerativeModel(self.llm_model)
+                self.client = None
+            except Exception as e:
+                logger.error(f"Failed to initialize Vertex AI: {e}")
+                raise ValueError(f"Vertex AI initialization failed: {e}. Ensure Vertex AI API is enabled and service account has permissions.")
         else:
-            raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
+            raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}. Use 'vertex_ai' or 'anthropic'.")
     
     def _call_llm(self, prompt: str, system_prompt: str = "") -> str:
         """Call LLM with prompt and return response."""
         try:
             if settings.llm_provider == "anthropic":
+                if not self.client:
+                    raise ValueError("Anthropic client not initialized")
                 message = self.client.messages.create(
                     model=self.llm_model,
                     max_tokens=2000,
@@ -46,10 +65,18 @@ class AccountScorer:
                 return message.content[0].text
             else:
                 # Vertex AI
-                response = self.model.generate_content(
-                    f"{system_prompt}\n\n{prompt}"
-                )
-                return response.text
+                if not self.model:
+                    raise ValueError("Vertex AI model not initialized")
+                # Combine system prompt and user prompt
+                full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+                response = self.model.generate_content(full_prompt)
+                # Handle Vertex AI response format
+                if hasattr(response, 'text'):
+                    return response.text
+                elif hasattr(response, 'candidates') and response.candidates:
+                    return response.candidates[0].content.parts[0].text
+                else:
+                    raise ValueError(f"Unexpected Vertex AI response format: {response}")
         except Exception as e:
             logger.error(f"Error calling LLM: {e}", exc_info=True)
             raise

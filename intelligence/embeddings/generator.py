@@ -4,12 +4,18 @@ Supports OpenAI and Vertex AI embedding models.
 """
 import logging
 from typing import List, Optional
-import openai
 from google.cloud import bigquery
 from google.cloud import aiplatform
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
+
+# Conditional imports
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
 
 logger = setup_logger(__name__)
 
@@ -22,14 +28,25 @@ class EmbeddingGenerator:
         self.embedding_model = settings.embedding_model
         
         # Determine embedding provider (can be different from LLM provider)
-        embedding_provider = getattr(settings, 'embedding_provider', settings.llm_provider)
+        embedding_provider = getattr(settings, 'embedding_provider', 'vertex_ai')
         
         if embedding_provider == "openai":
+            if not OPENAI_AVAILABLE:
+                raise ImportError("openai package not installed. Install with: pip install openai")
+            if not settings.openai_api_key:
+                raise ValueError("OpenAI API key not configured. Set 'openai-api-key' secret or use vertex_ai provider.")
             self.client = openai.OpenAI(api_key=settings.openai_api_key)
+            self.embedding_provider = "openai"
         elif embedding_provider == "vertex_ai":
-            aiplatform.init(project=settings.gcp_project_id)
+            try:
+                aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
+                self.client = None
+                self.embedding_provider = "vertex_ai"
+            except Exception as e:
+                logger.error(f"Failed to initialize Vertex AI: {e}")
+                raise ValueError(f"Vertex AI initialization failed: {e}. Ensure Vertex AI API is enabled.")
         else:
-            raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
+            raise ValueError(f"Unsupported embedding provider: {embedding_provider}. Use 'vertex_ai' or 'openai'.")
     
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for a single text string."""
@@ -37,10 +54,10 @@ class EmbeddingGenerator:
             return []
         
         try:
-            embedding_provider = getattr(settings, 'embedding_provider', settings.llm_provider)
-            
-            if embedding_provider == "openai":
+            if self.embedding_provider == "openai":
                 # OpenAI embedding
+                if not self.client:
+                    raise ValueError("OpenAI client not initialized")
                 response = self.client.embeddings.create(
                     model=self.embedding_model,
                     input=text[:8000]  # Limit text length
@@ -51,7 +68,16 @@ class EmbeddingGenerator:
                 from vertexai.language_models import TextEmbeddingModel
                 model = TextEmbeddingModel.from_pretrained(self.embedding_model)
                 embeddings = model.get_embeddings([text[:8000]])
-                return embeddings[0].values
+                # Handle different response formats
+                if embeddings and len(embeddings) > 0:
+                    emb = embeddings[0]
+                    if hasattr(emb, 'values'):
+                        return emb.values
+                    elif isinstance(emb, list):
+                        return emb
+                    else:
+                        return list(emb)
+                return []
         except Exception as e:
             logger.error(f"Error generating embedding: {e}", exc_info=True)
             return []
@@ -64,10 +90,10 @@ class EmbeddingGenerator:
             batch = texts[i:i + batch_size]
             
             try:
-                embedding_provider = getattr(settings, 'embedding_provider', settings.llm_provider)
-                
-                if embedding_provider == "openai":
+                if self.embedding_provider == "openai":
                     # OpenAI batch embedding
+                    if not self.client:
+                        raise ValueError("OpenAI client not initialized")
                     response = self.client.embeddings.create(
                         model=self.embedding_model,
                         input=[t[:8000] for t in batch]
@@ -78,7 +104,15 @@ class EmbeddingGenerator:
                     from vertexai.language_models import TextEmbeddingModel
                     model = TextEmbeddingModel.from_pretrained(self.embedding_model)
                     embeddings = model.get_embeddings([t[:8000] for t in batch])
-                    batch_embeddings = [emb.values for emb in embeddings]
+                    # Handle different response formats
+                    batch_embeddings = []
+                    for emb in embeddings:
+                        if hasattr(emb, 'values'):
+                            batch_embeddings.append(emb.values)
+                        elif isinstance(emb, list):
+                            batch_embeddings.append(emb)
+                        else:
+                            batch_embeddings.append(list(emb))
                 
                 all_embeddings.extend(batch_embeddings)
             except Exception as e:

@@ -84,3 +84,6 @@ Created `scripts/deploy_hubspot_sync.sh` that uses an env vars file to avoid com
 
 The function is ready to sync HubSpot sequences data to BigQuery!
 
+
+
+

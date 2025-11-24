@@ -46,3 +46,6 @@ rm -f "$ENV_VARS_FILE"
 echo ""
 echo "✓ HubSpot sync deployed successfully!"
 
+
+
+

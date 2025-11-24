@@ -79,3 +79,5 @@ gcloud functions deploy dialpad-sync --gen2 --runtime=python311 --region=us-cent
 ✅ **Fix implemented and ready for deployment**
 
 
+
+

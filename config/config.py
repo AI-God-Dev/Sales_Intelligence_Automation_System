@@ -148,9 +148,11 @@ class Settings(BaseSettings):
     gmail_oauth_client_secret: str = os.getenv("GMAIL_OAUTH_CLIENT_SECRET", "")
     
     # LLM Configuration
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # anthropic or vertex_ai
-    llm_model: str = os.getenv("LLM_MODEL", "claude-3-5-sonnet-20241022")
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    # Default to Vertex AI (recommended - no API keys needed, uses GCP service account)
+    llm_provider: str = os.getenv("LLM_PROVIDER", "vertex_ai")  # vertex_ai (recommended) or anthropic
+    llm_model: str = os.getenv("LLM_MODEL", "gemini-pro")  # Vertex AI: gemini-pro, text-bison@001 | Anthropic: claude-3-5-sonnet-20241022
+    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "vertex_ai")  # vertex_ai (recommended) or openai
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "textembedding-gecko@001")  # Vertex AI: textembedding-gecko@001 | OpenAI: text-embedding-3-small
     
     # Email Configuration
     gmail_mailboxes: list[str] = [

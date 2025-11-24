@@ -97,59 +97,132 @@ def _sync_sequences(api_client: HubSpot, bq_client: BigQueryClient) -> tuple[int
     errors = 0
     
     try:
-        # HubSpot sequences are accessed via Automation API v4
-        # Use /automation/v4/workflows endpoint (not /marketing/v3/sequences)
         import requests
         from config.config import settings
         
-        url = "https://api.hubapi.com/automation/v4/workflows"
-        headers = {
-            "Authorization": f"Bearer {settings.hubspot_api_key}",
-            "Content-Type": "application/json"
-        }
+        # Try multiple endpoints - HubSpot has different APIs for different subscription levels
+        endpoints_to_try = [
+            ("/automation/v4/workflows", "Automation API v4"),
+            ("/marketing/v3/sequences", "Marketing API v3"),
+            ("/crm/v3/objects/sequences", "CRM API v3"),
+        ]
         
-        logger.info("Fetching sequences from HubSpot Automation API...")
-        response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
-        sequences_data = response.json()
-        
-        # Parse sequences from response
-        # Automation API v4 returns: {"results": [...], "paging": {...}}
         sequences_list = []
-        if isinstance(sequences_data, dict):
-            # Automation API v4 paginated response format
-            if 'results' in sequences_data:
-                sequences_list = sequences_data['results']
-            # Direct list (fallback)
-            elif isinstance(sequences_data.get('data'), list):
-                sequences_list = sequences_data['data']
-            # Single sequence (fallback)
-            elif sequences_data.get('id'):
-                sequences_list = [sequences_data]
-        elif isinstance(sequences_data, list):
-            sequences_list = sequences_data
+        last_error = None
         
-        logger.info(f"Found {len(sequences_list)} sequences in HubSpot")
+        for endpoint, api_name in endpoints_to_try:
+            try:
+                url = f"https://api.hubapi.com{endpoint}"
+                headers = {
+                    "Authorization": f"Bearer {settings.hubspot_api_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                logger.info(f"Trying to fetch sequences from {api_name} ({endpoint})...")
+                response = requests.get(url, headers=headers, timeout=30)
+                
+                if response.status_code == 404:
+                    logger.warning(f"{api_name} endpoint not available (404) - trying next endpoint")
+                    last_error = f"404 Not Found: {endpoint}"
+                    continue
+                
+                response.raise_for_status()
+                sequences_data = response.json()
+                
+                # Parse sequences from response based on API format
+                if isinstance(sequences_data, dict):
+                    # Automation API v4: {"results": [...], "paging": {...}}
+                    if 'results' in sequences_data:
+                        sequences_list = sequences_data['results']
+                    # Marketing API v3: {"objects": [...]}
+                    elif 'objects' in sequences_data:
+                        sequences_list = sequences_data['objects']
+                    # Direct list (fallback)
+                    elif isinstance(sequences_data.get('data'), list):
+                        sequences_list = sequences_data['data']
+                    # Single sequence (fallback)
+                    elif sequences_data.get('id'):
+                        sequences_list = [sequences_data]
+                elif isinstance(sequences_data, list):
+                    sequences_list = sequences_data
+                
+                if sequences_list:
+                    logger.info(f"Successfully fetched {len(sequences_list)} sequences from {api_name}")
+                    break
+                    
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 404:
+                    logger.warning(f"{api_name} endpoint not available - trying next endpoint")
+                    last_error = str(e)
+                    continue
+                else:
+                    logger.error(f"HTTP error from {api_name}: {e}")
+                    last_error = str(e)
+            except Exception as e:
+                logger.warning(f"Error trying {api_name}: {e} - trying next endpoint")
+                last_error = str(e)
+        
+        # If no sequences found via API, check if we can use the HubSpot SDK
+        if not sequences_list:
+            try:
+                logger.info("Trying HubSpot Python SDK...")
+                # Try using the SDK's automation API
+                if hasattr(api_client, 'automation'):
+                    workflows = api_client.automation.workflows_api.get_all()
+                    if hasattr(workflows, 'results'):
+                        sequences_list = workflows.results
+                    elif isinstance(workflows, list):
+                        sequences_list = workflows
+            except Exception as e:
+                logger.warning(f"HubSpot SDK method also failed: {e}")
+        
+        # If still no sequences, log warning but don't fail completely
+        if not sequences_list:
+            logger.warning(
+                f"Could not fetch sequences from HubSpot. "
+                f"This may be because Marketing Automation is not enabled in your HubSpot account. "
+                f"Last error: {last_error}. "
+                f"Creating empty sync record."
+            )
+            # Insert a placeholder record to indicate sync ran but no sequences found
+            placeholder_row = {
+                "sequence_id": "NO_SEQUENCES_AVAILABLE",
+                "sequence_name": "No sequences available - Marketing Automation may not be enabled",
+                "is_active": False,
+                "enrollment_count": 0,
+                "last_synced": datetime.now(timezone.utc).isoformat()
+            }
+            try:
+                bq_client.insert_rows("hubspot_sequences", [placeholder_row])
+                logger.info("Inserted placeholder record indicating no sequences available")
+            except Exception as e:
+                logger.error(f"Error inserting placeholder: {e}")
+            return 0, 0  # Return success with 0 sequences (not an error condition)
+        
+        logger.info(f"Processing {len(sequences_list)} sequences from HubSpot")
         
         rows = []
         for sequence in sequences_list:
             try:
-                # Automation API v4 workflow format
-                # Filter for sequences only (workflow type = "DRIP_DELAY" or "SEQUENCE")
+                # Handle different API response formats
+                sequence_id = str(sequence.get("id") or sequence.get("workflowId") or sequence.get("sequenceId") or "")
+                sequence_name = sequence.get("name") or sequence.get("workflowName") or sequence.get("sequenceName") or "Unknown"
+                
+                # Filter for sequences only if type field exists
                 workflow_type = sequence.get("type", "").upper()
-                if workflow_type not in ["DRIP_DELAY", "SEQUENCE"]:
-                    # Skip non-sequence workflows
+                if workflow_type and workflow_type not in ["DRIP_DELAY", "SEQUENCE", "DRIP"]:
+                    # Skip non-sequence workflows if type is specified
                     continue
                 
                 row = {
-                    "sequence_id": str(sequence.get("id") or sequence.get("workflowId", "")),
-                    "sequence_name": sequence.get("name") or sequence.get("workflowName", ""),
-                    "is_active": sequence.get("enabled", sequence.get("active", True)),
-                    "enrollment_count": sequence.get("contactCount", sequence.get("enrollmentCount", sequence.get("enrolledContacts", 0))),
+                    "sequence_id": sequence_id,
+                    "sequence_name": sequence_name,
+                    "is_active": sequence.get("enabled", sequence.get("active", sequence.get("isActive", True))),
+                    "enrollment_count": sequence.get("contactCount", sequence.get("enrollmentCount", sequence.get("enrolledContacts", sequence.get("enrollments", 0)))),
                     "last_synced": datetime.now(timezone.utc).isoformat()
                 }
                 # Only add if we have at least an ID
-                if row["sequence_id"]:
+                if row["sequence_id"] and row["sequence_id"] != "NO_SEQUENCES_AVAILABLE":
                     rows.append(row)
             except Exception as e:
                 logger.error(f"Error transforming sequence {sequence.get('id', 'unknown')}: {e}")
@@ -164,7 +237,7 @@ def _sync_sequences(api_client: HubSpot, bq_client: BigQueryClient) -> tuple[int
                 logger.error(f"Error inserting sequences: {e}")
                 errors += len(rows)
         else:
-            logger.warning("No sequences to insert (empty or invalid data)")
+            logger.warning("No valid sequences to insert after processing")
         
         return sequences_synced, errors
         

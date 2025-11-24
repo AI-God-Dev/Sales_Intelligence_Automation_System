@@ -74,3 +74,5 @@ gcloud functions deploy hubspot-sync --gen2 --runtime=python311 --region=us-cent
 
 ✅ **Fix implemented and ready for deployment**
 
+
+

@@ -119,3 +119,6 @@ After adding the API key, verify ingestion:
 Once the HubSpot API key is added to Secret Manager, the ingestion should work successfully with the increased memory allocation!
 
 
+
+
+
