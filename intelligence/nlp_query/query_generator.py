@@ -4,6 +4,7 @@ Converts user questions to BigQuery SQL queries.
 """
 import logging
 import re
+import warnings
 from typing import Dict, Any, Optional, Tuple
 import anthropic
 from google.cloud import bigquery
@@ -11,6 +12,10 @@ from google.cloud import aiplatform
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
+
+# Suppress pkg_resources deprecation warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
+warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
 
 logger = setup_logger(__name__)
 
@@ -45,7 +50,10 @@ class NLPQueryGenerator:
         if settings.llm_provider == "anthropic":
             self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         elif settings.llm_provider == "vertex_ai":
-            aiplatform.init(project=settings.gcp_project_id)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning)
+                warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+                aiplatform.init(project=settings.gcp_project_id)
             from vertexai.generative_models import GenerativeModel
             self.model = GenerativeModel(self.llm_model)
         else:

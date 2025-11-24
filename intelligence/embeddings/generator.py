@@ -5,10 +5,15 @@ Supports OpenAI and Vertex AI embedding models.
 import logging
 from typing import List, Optional
 from google.cloud import bigquery
+import warnings
 from google.cloud import aiplatform
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
+
+# Suppress pkg_resources deprecation warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
+warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
 
 # Conditional imports
 try:
@@ -39,7 +44,10 @@ class EmbeddingGenerator:
             self.embedding_provider = "openai"
         elif embedding_provider == "vertex_ai":
             try:
-                aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+                    aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
                 self.client = None
                 self.embedding_provider = "vertex_ai"
             except Exception as e:

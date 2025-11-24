@@ -7,10 +7,15 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import uuid
 from google.cloud import bigquery
+import warnings
 from google.cloud import aiplatform
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
+
+# Suppress pkg_resources deprecation warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
+warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
 
 # Conditional import for Anthropic (only if needed)
 try:
@@ -38,7 +43,10 @@ class AccountScorer:
             self.model = None
         elif settings.llm_provider == "vertex_ai":
             try:
-                aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning)
+                    warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+                    aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
                 from vertexai.generative_models import GenerativeModel
                 self.model = GenerativeModel(self.llm_model)
                 self.client = None
