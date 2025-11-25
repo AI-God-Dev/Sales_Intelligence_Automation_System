@@ -204,7 +204,81 @@ def _sync_calls(
     if sync_type == "incremental":
         last_sync_time = _get_last_sync_time(bq_client, user_id)
     
-    # Fetch calls from Dialpad API
+    # Try multiple endpoint patterns - Dialpad API structure may vary
+    endpoints_to_try = [
+        (f"/users/{user_id}/calls", "User-specific calls endpoint", False),
+        (f"/calls", "General calls endpoint with user_id param", True),
+        (f"/call_logs", "Call logs endpoint", True),
+    ]
+    
+    calls_data = None
+    working_endpoint = None
+    needs_user_filter = False
+    
+    for endpoint, description, use_user_param in endpoints_to_try:
+        try:
+            params = {
+                "page": 1,
+                "per_page": 100
+            }
+            
+            # For general endpoints, add user_id as param
+            if use_user_param:
+                params["user_id"] = user_id
+            
+            if last_sync_time:
+                params["start_time"] = last_sync_time
+            
+            logger.info(f"Trying {description} ({endpoint}) for user {user_id}...")
+            response = requests.get(
+                f"{base_url}{endpoint}",
+                headers=headers,
+                params=params,
+                timeout=30
+            )
+            
+            if response.status_code == 404:
+                logger.warning(f"{description} returned 404, trying next endpoint...")
+                continue
+            
+            if not response.ok:
+                logger.warning(f"{description} returned {response.status_code}, trying next endpoint...")
+                continue
+            
+            data = response.json()
+            calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
+            
+            # If using general endpoint, filter calls by user_id
+            if use_user_param and calls:
+                # Filter calls that belong to this user (check various user_id fields)
+                filtered_calls = [
+                    call for call in calls 
+                    if str(call.get("user_id")) == str(user_id) or 
+                       str(call.get("owner_id")) == str(user_id) or
+                       str(call.get("caller_id")) == str(user_id)
+                ]
+                if not filtered_calls:
+                    logger.warning(f"No calls found for user {user_id} in general endpoint response")
+                    continue
+                data["items"] = filtered_calls
+                calls = filtered_calls
+            
+            if calls or data:  # Accept if we got data structure even if empty
+                calls_data = data
+                working_endpoint = endpoint
+                needs_user_filter = use_user_param
+                logger.info(f"Successfully connected to {description} for user {user_id}")
+                break
+                
+        except requests.RequestException as e:
+            logger.warning(f"Error trying {description}: {e}, trying next endpoint...")
+            continue
+    
+    if not calls_data:
+        logger.warning(f"All endpoints failed for user {user_id}. User may not have calls or API structure differs.")
+        return 0, 0
+    
+    # Fetch calls from Dialpad API using working endpoint
     page = 1
     while True:
         params = {
@@ -212,27 +286,35 @@ def _sync_calls(
             "per_page": 100
         }
         
+        # For general endpoints, add user_id as param
+        if needs_user_filter:
+            params["user_id"] = user_id
+        
         if last_sync_time:
             params["start_time"] = last_sync_time
         
         try:
             response = requests.get(
-                f"{base_url}/users/{user_id}/calls",
+                f"{base_url}{working_endpoint}",
                 headers=headers,
                 params=params,
                 timeout=30
             )
             
-            # Handle 404 - user might not have calls endpoint accessible
-            if response.status_code == 404:
-                logger.info(f"User {user_id} endpoint not found (404). User may not have calls or endpoint not accessible. Skipping...")
-                # Return 0 calls, 0 errors (not an error, just no data)
-                return 0, 0
-            
             response.raise_for_status()
             data = response.json()
             
-            calls = data.get("items", []) or data.get("calls", [])
+            calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
+            
+            # If using general endpoint, filter calls by user_id
+            if needs_user_filter and calls:
+                calls = [
+                    call for call in calls 
+                    if str(call.get("user_id")) == str(user_id) or 
+                       str(call.get("owner_id")) == str(user_id) or
+                       str(call.get("caller_id")) == str(user_id)
+                ]
+            
             if not calls:
                 break
             
