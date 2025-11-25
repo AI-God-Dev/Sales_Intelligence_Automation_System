@@ -205,9 +205,10 @@ def _sync_calls(
         last_sync_time = _get_last_sync_time(bq_client, user_id)
     
     # Try multiple endpoint patterns - Dialpad API structure may vary
+    # Based on working curl -G command, /calls endpoint works
     endpoints_to_try = [
+        (f"/calls", "General calls endpoint", True),  # This is the working endpoint
         (f"/users/{user_id}/calls", "User-specific calls endpoint", False),
-        (f"/calls", "General calls endpoint with user_id param", True),
         (f"/call_logs", "Call logs endpoint", True),
     ]
     
@@ -304,13 +305,20 @@ def _sync_calls(
             response.raise_for_status()
             data = response.json()
             
-            calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
+            # Handle different response structures
+            # Response might be: array directly, or {"items": [...]}, or {"calls": [...]}
+            if isinstance(data, list):
+                calls = data
+            else:
+                calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
             
             # If using general endpoint, filter calls by user_id
+            # Check target.id (user who received/made call) or contact.id
             if needs_user_filter and calls:
                 calls = [
                     call for call in calls 
-                    if str(call.get("user_id")) == str(user_id) or 
+                    if str(call.get("target", {}).get("id")) == str(user_id) or 
+                       str(call.get("user_id")) == str(user_id) or 
                        str(call.get("owner_id")) == str(user_id) or
                        str(call.get("caller_id")) == str(user_id)
                 ]
@@ -325,7 +333,8 @@ def _sync_calls(
                     row = _transform_call(call, user_id)
                     rows.append(row)
                 except Exception as e:
-                    logger.error(f"Error transforming call {call.get('id')}: {e}")
+                    call_id = call.get("call_id") or call.get("id", "unknown")
+                    logger.error(f"Error transforming call {call_id}: {e}")
                     errors += 1
             
             if rows:
@@ -361,33 +370,69 @@ def _sync_calls(
 
 def _transform_call(call: dict, user_id: str) -> dict:
     """Transform Dialpad call record to BigQuery row format."""
-    from_number = normalize_phone(call.get("from_number", ""))
-    to_number = normalize_phone(call.get("to_number", ""))
+    # Dialpad API returns: call_id, external_number, internal_number, date_started, duration (ms)
+    call_id = call.get("call_id") or call.get("id")
+    
+    # Get phone numbers - Dialpad uses external_number and internal_number
+    external_number = call.get("external_number", "")
+    internal_number = call.get("internal_number", "")
+    
+    # Determine from/to based on direction
+    direction = call.get("direction", "").lower()
+    if direction == "outbound":
+        from_number = normalize_phone(internal_number)
+        to_number = normalize_phone(external_number)
+    else:  # inbound
+        from_number = normalize_phone(external_number)
+        to_number = normalize_phone(internal_number)
+    
+    # Duration is in milliseconds, convert to seconds
+    duration_ms = call.get("duration", 0)
+    duration_seconds = int(duration_ms / 1000) if duration_ms else None
+    
+    # Parse timestamp - Dialpad returns milliseconds timestamp
+    date_started = call.get("date_started")
+    call_time = _parse_timestamp_ms(date_started) if date_started else None
+    
+    # Get transcript if available
+    transcript_text = None
+    if call.get("recording_details"):
+        # Transcript might be in recording_details or separate endpoint
+        transcript_text = None  # Will be fetched separately if needed
+    
+    # Get sentiment if available
+    sentiment_score = call.get("mos_score")  # Dialpad uses MOS score, not sentiment
+    
+    # Get user_id from target if not provided
+    target_user_id = call.get("target", {}).get("id") if call.get("target") else user_id
     
     return {
-        "call_id": call.get("id"),
-        "direction": call.get("direction", "").lower(),
+        "call_id": str(call_id) if call_id else None,
+        "direction": direction,
         "from_number": from_number,
         "to_number": to_number,
-        "duration_seconds": call.get("duration_seconds"),
-        "transcript_text": call.get("transcript", {}).get("text") if call.get("transcript") else None,
-        "sentiment_score": call.get("sentiment_score"),
-        "call_time": _parse_timestamp(call.get("start_time")),
-        "user_id": user_id,
+        "duration_seconds": duration_seconds,
+        "transcript_text": transcript_text,
+        "sentiment_score": float(sentiment_score) if sentiment_score else None,
+        "call_time": call_time,
+        "user_id": str(target_user_id) if target_user_id else user_id,
         "ingested_at": datetime.now(timezone.utc).isoformat()
     }
 
 
-def _parse_timestamp(timestamp: str) -> str:
-    """Parse Dialpad timestamp to ISO format."""
-    if not timestamp:
+def _parse_timestamp_ms(timestamp_ms: str) -> str:
+    """Parse Dialpad timestamp (milliseconds) to ISO format."""
+    if not timestamp_ms:
         return None
     
     try:
-        from dateutil import parser
-        dt = parser.parse(timestamp)
+        # Dialpad returns timestamp in milliseconds as string
+        timestamp_int = int(timestamp_ms)
+        # Convert milliseconds to seconds
+        dt = datetime.fromtimestamp(timestamp_int / 1000.0, tz=timezone.utc)
         return dt.isoformat()
-    except Exception:
+    except (ValueError, TypeError, OSError) as e:
+        logger.warning(f"Error parsing timestamp {timestamp_ms}: {e}")
         return datetime.now(timezone.utc).isoformat()
 
 

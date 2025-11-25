@@ -114,11 +114,21 @@ class DialpadAPIClient:
             if end_time:
                 params["end_time"] = end_time
             
-            # Use /users/{user_id}/calls endpoint if user_id provided, otherwise /calls
-            endpoint = f"/users/{user_id}/calls" if user_id else "/calls"
+            # Use /calls endpoint (works with curl -G)
+            # Add user_id as query parameter if provided
+            if user_id:
+                params["user_id"] = user_id
+            
+            endpoint = "/calls"
             response = self._make_request("GET", endpoint, params=params)
             
-            calls = response.get("items", []) or response.get("calls", [])
+            # Handle different response structures
+            # Response might be: array directly, or {"items": [...]}, or {"calls": [...]}
+            if isinstance(response, list):
+                calls = response
+            else:
+                calls = response.get("items", []) or response.get("calls", []) or response.get("data", [])
+            
             logger.info(f"Retrieved {len(calls)} call logs")
             
             return calls
