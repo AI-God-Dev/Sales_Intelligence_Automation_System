@@ -139,35 +139,42 @@ def _get_salesforce_client(settings) -> Salesforce:
     
     Note: Salesforce does NOT support Client Credentials OAuth flow.
     """
-    try:
-        # Try OAuth 2.0 Refresh Token flow first (more secure)
-        client_id = settings.salesforce_client_id
-        client_secret = settings.salesforce_client_secret
-        refresh_token = getattr(settings, 'salesforce_refresh_token', None) or ""
-        domain = settings.salesforce_domain  # 'login' or 'test'
-        
-        if client_id and client_secret and refresh_token:
+    # Try OAuth 2.0 Refresh Token flow first (more secure)
+    client_id = settings.salesforce_client_id
+    client_secret = settings.salesforce_client_secret
+    refresh_token = getattr(settings, 'salesforce_refresh_token', None) or ""
+    domain = settings.salesforce_domain  # 'login' or 'test'
+    
+    if client_id and client_secret and refresh_token:
+        try:
             logger.info("Using OAuth 2.0 Refresh Token flow for Salesforce")
             return _authenticate_with_oauth(client_id, client_secret, refresh_token, domain)
-        
-        # Fallback to username/password if OAuth not available
-        logger.info("Using username/password authentication for Salesforce (OAuth not configured)")
-        username = settings.salesforce_username or ""
-        password = settings.salesforce_password or ""
-        security_token = settings.salesforce_security_token or ""
-        
-        if not username or not password:
-            raise Exception("Neither OAuth credentials (client_id, client_secret, refresh_token) nor username/password are configured. Please set secrets in Secret Manager.")
-        
+        except Exception as oauth_error:
+            # OAuth failed, fall back to username/password
+            error_msg = str(oauth_error).lower()
+            if "invalid_client" in error_msg or "invalid" in error_msg:
+                logger.warning(f"OAuth authentication failed: {oauth_error}. Falling back to username/password authentication.")
+            else:
+                logger.warning(f"OAuth authentication failed: {oauth_error}. Falling back to username/password authentication.")
+    
+    # Fallback to username/password if OAuth not available or failed
+    logger.info("Using username/password authentication for Salesforce")
+    username = settings.salesforce_username or ""
+    password = settings.salesforce_password or ""
+    security_token = settings.salesforce_security_token or ""
+    
+    if not username or not password:
+        raise Exception("Neither OAuth credentials (client_id, client_secret, refresh_token) nor username/password are configured. Please set secrets in Secret Manager.")
+    
+    try:
         return Salesforce(
             username=username,
             password=password,
             security_token=security_token,
             domain=domain
         )
-        
     except Exception as e:
-        logger.error(f"Failed to authenticate with Salesforce: {e}", exc_info=True)
+        logger.error(f"Failed to authenticate with Salesforce using username/password: {e}", exc_info=True)
         raise
 
 
