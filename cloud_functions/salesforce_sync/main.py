@@ -134,27 +134,21 @@ def _get_salesforce_client(settings) -> Salesforce:
     Get Salesforce client using OAuth 2.0 (preferred) or username/password (fallback).
     
     OAuth 2.0 supports:
-    - Client Credentials flow: Client ID, Client Secret, Instance URL
-    - Refresh Token flow: Client ID, Client Secret, Refresh Token
-    Username/password uses: Username, Password, Security Token
+    - Refresh Token flow: Client ID, Client Secret, Refresh Token (preferred)
+    Username/password uses: Username, Password, Security Token (fallback)
+    
+    Note: Salesforce does NOT support Client Credentials OAuth flow.
     """
     try:
-        # Try OAuth 2.0 first (more secure)
+        # Try OAuth 2.0 Refresh Token flow first (more secure)
         client_id = settings.salesforce_client_id
         client_secret = settings.salesforce_client_secret
         refresh_token = getattr(settings, 'salesforce_refresh_token', None) or ""
-        instance_url = getattr(settings, 'salesforce_instance_url', None) or ""
         domain = settings.salesforce_domain  # 'login' or 'test'
         
-        if client_id and client_secret:
-            # Prefer Client Credentials flow if instance_url provided
-            if instance_url:
-                logger.info("Using OAuth 2.0 Client Credentials flow for Salesforce")
-                return _authenticate_with_oauth(client_id, client_secret, None, domain, instance_url)
-            # Fallback to Refresh Token flow
-            elif refresh_token:
-                logger.info("Using OAuth 2.0 Refresh Token flow for Salesforce")
-                return _authenticate_with_oauth(client_id, client_secret, refresh_token, domain, None)
+        if client_id and client_secret and refresh_token:
+            logger.info("Using OAuth 2.0 Refresh Token flow for Salesforce")
+            return _authenticate_with_oauth(client_id, client_secret, refresh_token, domain)
         
         # Fallback to username/password if OAuth not available
         logger.info("Using username/password authentication for Salesforce (OAuth not configured)")
@@ -177,68 +171,72 @@ def _get_salesforce_client(settings) -> Salesforce:
         raise
 
 
-def _authenticate_with_oauth(client_id: str, client_secret: str, refresh_token: str, domain: str, instance_url: str = None) -> Salesforce:
+def _authenticate_with_oauth(client_id: str, client_secret: str, refresh_token: str, domain: str) -> Salesforce:
     """
-    Authenticate with Salesforce using OAuth 2.0.
-    Supports both Client Credentials flow and Refresh Token flow.
+    Authenticate with Salesforce using OAuth 2.0 Refresh Token flow.
+    
+    Note: Salesforce does NOT support Client Credentials OAuth flow.
+    Only Refresh Token, Username-Password, and Authorization Code flows are supported.
     
     Args:
         client_id: Salesforce Connected App Consumer Key
         client_secret: Salesforce Connected App Consumer Secret
-        refresh_token: OAuth 2.0 refresh token (optional, for refresh token flow)
+        refresh_token: OAuth 2.0 refresh token (required)
         domain: 'login' for production, 'test' for sandbox
-        instance_url: Salesforce instance URL (required for client credentials flow)
     
     Returns:
         Authenticated Salesforce client instance
     """
+    if not refresh_token:
+        raise Exception("Refresh token is required for OAuth 2.0 authentication with Salesforce")
+    
     # Determine token URL based on domain
     if domain == "test":
         token_url = "https://test.salesforce.com/services/oauth2/token"
     else:
         token_url = "https://login.salesforce.com/services/oauth2/token"
     
-    # Try Client Credentials flow first (if instance_url provided)
-    if instance_url:
-        logger.info("Using Client Credentials OAuth flow for Salesforce")
-        token_data = {
-            "grant_type": "client_credentials",
-            "client_id": client_id,
-            "client_secret": client_secret
-        }
-    else:
-        # Use Refresh Token flow (fallback)
-        if not refresh_token:
-            raise Exception("Either instance_url (for client credentials) or refresh_token (for refresh token flow) must be provided")
-        logger.info("Using Refresh Token OAuth flow for Salesforce")
-        token_data = {
-            "grant_type": "refresh_token",
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "refresh_token": refresh_token
-        }
+    # Use Refresh Token flow (Salesforce standard OAuth flow)
+    logger.info("Using Refresh Token OAuth flow for Salesforce")
+    token_data = {
+        "grant_type": "refresh_token",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token
+    }
     
-    response = requests.post(token_url, data=token_data, timeout=30)
-    response.raise_for_status()
-    
-    token_response = response.json()
-    access_token = token_response["access_token"]
-    
-    # Use provided instance_url or get from token response
-    if not instance_url:
+    try:
+        response = requests.post(token_url, data=token_data, timeout=30)
+        
+        # Log detailed error information if request fails
+        if not response.ok:
+            error_detail = response.text
+            logger.error(f"Salesforce OAuth token request failed: {response.status_code} - {error_detail}")
+        
+        response.raise_for_status()
+        token_response = response.json()
+        access_token = token_response["access_token"]
         instance_url = token_response.get("instance_url")
+        
         if not instance_url:
-            raise Exception("Instance URL not provided and not found in token response")
-    
-    logger.info(f"Successfully authenticated with Salesforce OAuth. Instance: {instance_url}")
-    
-    # Create Salesforce client with access token and instance URL
-    sf = Salesforce(
-        instance_url=instance_url,
-        session_id=access_token
-    )
-    
-    return sf
+            raise Exception("Instance URL not found in token response")
+        
+        logger.info(f"Successfully authenticated with Salesforce OAuth. Instance: {instance_url}")
+        
+        # Create Salesforce client with access token and instance URL
+        sf = Salesforce(
+            instance_url=instance_url,
+            session_id=access_token
+        )
+        
+        return sf
+        
+    except requests.exceptions.HTTPError as e:
+        error_msg = f"Salesforce OAuth authentication failed: {e}"
+        if hasattr(e.response, 'text'):
+            error_msg += f" - Response: {e.response.text}"
+        logger.error(error_msg)
+        raise Exception(error_msg) from e
 
 
 def _get_available_fields(sf: Salesforce, object_type: str, desired_fields: list[str]) -> str:
