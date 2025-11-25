@@ -121,12 +121,18 @@ def _sync_sequences(api_client: HubSpot, bq_client: BigQueryClient) -> tuple[int
                 logger.info(f"Trying to fetch sequences from {api_name} ({endpoint})...")
                 response = requests.get(url, headers=headers, timeout=30)
                 
+                # Check status code BEFORE calling raise_for_status()
                 if response.status_code == 404:
                     logger.warning(f"{api_name} endpoint not available (404) - trying next endpoint")
                     last_error = f"404 Not Found: {endpoint}"
                     continue
                 
-                response.raise_for_status()
+                # Only raise for non-404 errors
+                if not response.ok:
+                    logger.warning(f"{api_name} returned status {response.status_code}: {response.text[:200]}")
+                    last_error = f"{response.status_code} {response.reason}: {endpoint}"
+                    continue
+                
                 sequences_data = response.json()
                 
                 # Parse sequences from response based on API format
@@ -165,16 +171,21 @@ def _sync_sequences(api_client: HubSpot, bq_client: BigQueryClient) -> tuple[int
         # If no sequences found via API, check if we can use the HubSpot SDK
         if not sequences_list:
             try:
-                logger.info("Trying HubSpot Python SDK...")
+                logger.info("Trying HubSpot Python SDK automation API...")
                 # Try using the SDK's automation API
-                if hasattr(api_client, 'automation'):
+                if hasattr(api_client, 'automation') and hasattr(api_client.automation, 'workflows_api'):
                     workflows = api_client.automation.workflows_api.get_all()
                     if hasattr(workflows, 'results'):
                         sequences_list = workflows.results
                     elif isinstance(workflows, list):
                         sequences_list = workflows
+                    elif hasattr(workflows, 'data'):
+                        sequences_list = workflows.data if isinstance(workflows.data, list) else []
+                    if sequences_list:
+                        logger.info(f"Successfully fetched {len(sequences_list)} sequences via HubSpot SDK")
             except Exception as e:
                 logger.warning(f"HubSpot SDK method also failed: {e}")
+                # Don't set last_error here, we want to preserve the API error message
         
         # If still no sequences, log warning but don't fail completely
         if not sequences_list:
