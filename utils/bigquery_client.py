@@ -8,11 +8,34 @@ from google.cloud import bigquery
 from google.cloud.exceptions import NotFound, BadRequest
 from typing import List, Dict, Any, Optional
 import logging
+from datetime import datetime, date
 from config.config import settings
 from utils.retry import retry_with_backoff
 from utils.monitoring import PerformanceMonitor, MetricsCollector
 
 logger = logging.getLogger(__name__)
+
+
+def _serialize_for_json(obj: Any) -> Any:
+    """
+    Convert datetime/date objects to ISO format strings for JSON serialization.
+    
+    Args:
+        obj: Object to serialize
+        
+    Returns:
+        JSON-serializable object
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif isinstance(obj, date):
+        return obj.isoformat()
+    elif isinstance(obj, dict):
+        return {k: _serialize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_serialize_for_json(item) for item in obj]
+    else:
+        return obj
 
 
 class BigQueryClient:
@@ -95,12 +118,15 @@ class BigQueryClient:
             try:
                 table_ref = self.dataset_ref.table(table_id)
                 
+                # Serialize datetime objects to ISO format strings for JSON compatibility
+                serialized_rows = [_serialize_for_json(row) for row in rows]
+                
                 # Insert rows using insert_rows_json
                 # Note: insert_rows_json doesn't accept job_config parameter
                 # Use skip_invalid_rows and ignore_unknown_values directly
                 errors = self.client.insert_rows_json(
                     table_ref,
-                    rows,
+                    serialized_rows,
                     skip_invalid_rows=skip_invalid_rows,
                     ignore_unknown_values=ignore_unknown_values
                 )
