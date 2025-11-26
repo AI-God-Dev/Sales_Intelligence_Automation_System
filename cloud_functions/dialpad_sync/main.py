@@ -257,28 +257,28 @@ def _sync_calls(
             else:
                 calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
             
-            # If we got calls but need to filter by user_id
+            # If we got calls, filter by user_id if needed
             # Check target.id (user who received/made call) from the JSON structure we saw
-            if calls and (not use_user_param or len(calls) > 0):
-                # Filter calls that belong to this user
-                # Check target.id (from the JSON: "target": {"id": "4966031882665984"})
-                filtered_calls = [
-                    call for call in calls 
-                    if str(call.get("target", {}).get("id")) == str(user_id) or 
-                       str(call.get("user_id")) == str(user_id) or 
-                       str(call.get("owner_id")) == str(user_id) or
-                       str(call.get("caller_id")) == str(user_id) or
-                       str(call.get("contact", {}).get("id")) == str(user_id)
-                ]
-                
-                # If we got all calls and need to filter, use filtered list
-                if not use_user_param and filtered_calls:
-                    calls = filtered_calls
-                    if isinstance(data, dict):
-                        data["items"] = filtered_calls
-                elif use_user_param and not filtered_calls:
-                    logger.warning(f"No calls found for user {user_id} in response")
-                    continue
+            if calls:
+                # If we got all calls (not filtered by API), filter by user_id
+                if not use_user_param:
+                    # Filter calls that belong to this user
+                    # Check target.id (from the JSON: "target": {"id": "4966031882665984"})
+                    filtered_calls = [
+                        call for call in calls 
+                        if str(call.get("target", {}).get("id")) == str(user_id) or 
+                           str(call.get("user_id")) == str(user_id) or 
+                           str(call.get("owner_id")) == str(user_id) or
+                           str(call.get("caller_id")) == str(user_id) or
+                           str(call.get("contact", {}).get("id")) == str(user_id)
+                    ]
+                    if filtered_calls:
+                        calls = filtered_calls
+                        if isinstance(data, dict):
+                            data["items"] = filtered_calls
+                    else:
+                        logger.warning(f"No calls found for user {user_id} in response")
+                        continue
             
             if calls or (isinstance(data, dict) and data):  # Accept if we got data structure even if empty
                 calls_data = data
@@ -323,10 +323,6 @@ def _sync_calls(
             
             # Handle different response structures
             # Response might be: array directly, or {"items": [...]}, or {"calls": [...]}
-            if isinstance(data, list):
-                calls = data
-            else:
-                # Handle different response structures
             if isinstance(data, list):
                 calls = data
             else:

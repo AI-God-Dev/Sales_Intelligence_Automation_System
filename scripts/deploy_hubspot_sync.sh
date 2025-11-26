@@ -50,3 +50,7 @@ echo "✓ HubSpot sync deployed successfully!"
 
 
 
+
+
+
+

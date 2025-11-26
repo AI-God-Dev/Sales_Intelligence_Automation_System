@@ -90,7 +90,7 @@ try {
 Write-Host ""
 
 # Step 6: Wait for syncs to complete
-Write-Host "Step 6: Waiting for syncs to complete (30 seconds)..." -ForegroundColor Yellow
+Write-Host "Step 6: Waiting for syncs to complete..." -ForegroundColor Yellow
 Start-Sleep -Seconds 30
 Write-Host ""
 
