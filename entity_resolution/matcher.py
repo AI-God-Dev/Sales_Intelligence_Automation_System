@@ -401,11 +401,129 @@ class EntityMatcher:
     
     def _batch_update_participants(self, updates: List[Dict[str, Any]]):
         """Batch update participants using MERGE statement."""
-        # No-op in unit test environment; persistence handled elsewhere
-        return
+        if not updates:
+            return
+        
+        # Build MERGE statement for batch update
+        merge_query = f"""
+        MERGE `{self.bq_client.project_id}.{self.bq_client.dataset_id}.gmail_participants` AS target
+        USING UNNEST(@updates) AS source
+        ON target.participant_id = source.participant_id
+        WHEN MATCHED THEN
+          UPDATE SET
+            sf_contact_id = source.sf_contact_id,
+            sf_account_id = source.sf_account_id,
+            match_confidence = source.match_confidence
+        """
+        
+        # Convert updates to BigQuery-compatible format
+        update_rows = [
+            {
+                "participant_id": u["participant_id"],
+                "sf_contact_id": u.get("sf_contact_id"),
+                "sf_account_id": u.get("sf_account_id"),
+                "match_confidence": u.get("match_confidence")
+            }
+            for u in updates
+        ]
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter(
+                    "updates",
+                    "STRUCT<participant_id STRING, sf_contact_id STRING, sf_account_id STRING, match_confidence STRING>[]",
+                    update_rows
+                )
+            ]
+        )
+        
+        try:
+            self.bq_client.query(merge_query, job_config)
+            logger.info(f"Updated {len(updates)} participant matches")
+        except Exception as e:
+            logger.error(f"Error batch updating participants: {e}", exc_info=True)
+            # Fallback to individual updates if batch fails
+            for update in updates:
+                try:
+                    update_query = f"""
+                    UPDATE `{self.bq_client.project_id}.{self.bq_client.dataset_id}.gmail_participants`
+                    SET 
+                      sf_contact_id = @contact_id,
+                      sf_account_id = @account_id,
+                      match_confidence = @confidence
+                    WHERE participant_id = @participant_id
+                    """
+                    update_job_config = bigquery.QueryJobConfig(
+                        query_parameters=[
+                            bigquery.ScalarQueryParameter("participant_id", "STRING", update["participant_id"]),
+                            bigquery.ScalarQueryParameter("contact_id", "STRING", update.get("sf_contact_id")),
+                            bigquery.ScalarQueryParameter("account_id", "STRING", update.get("sf_account_id")),
+                            bigquery.ScalarQueryParameter("confidence", "STRING", update.get("match_confidence"))
+                        ]
+                    )
+                    self.bq_client.query(update_query, update_job_config)
+                except Exception as e2:
+                    logger.error(f"Error updating participant {update.get('participant_id')}: {e2}")
     
     def _batch_update_calls(self, updates: List[Dict[str, Any]]):
         """Batch update calls using MERGE statement."""
-        # No-op in unit test environment; persistence handled elsewhere
-        return
+        if not updates:
+            return
+        
+        # Build MERGE statement for batch update
+        merge_query = f"""
+        MERGE `{self.bq_client.project_id}.{self.bq_client.dataset_id}.dialpad_calls` AS target
+        USING UNNEST(@updates) AS source
+        ON target.call_id = source.call_id
+        WHEN MATCHED THEN
+          UPDATE SET
+            matched_contact_id = source.matched_contact_id,
+            matched_account_id = source.matched_account_id
+        """
+        
+        # Convert updates to BigQuery-compatible format
+        update_rows = [
+            {
+                "call_id": u["call_id"],
+                "matched_contact_id": u.get("matched_contact_id"),
+                "matched_account_id": u.get("matched_account_id")
+            }
+            for u in updates
+        ]
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter(
+                    "updates",
+                    "STRUCT<call_id STRING, matched_contact_id STRING, matched_account_id STRING>[]",
+                    update_rows
+                )
+            ]
+        )
+        
+        try:
+            self.bq_client.query(merge_query, job_config)
+            logger.info(f"Updated {len(updates)} call matches")
+        except Exception as e:
+            logger.error(f"Error batch updating calls: {e}", exc_info=True)
+            # Fallback to individual updates if batch fails
+            for update in updates:
+                try:
+                    update_query = f"""
+                    UPDATE `{self.bq_client.project_id}.{self.bq_client.dataset_id}.dialpad_calls`
+                    SET 
+                      matched_contact_id = @contact_id,
+                      matched_account_id = @account_id
+                    WHERE call_id = @call_id
+                    """
+                    update_job_config = bigquery.QueryJobConfig(
+                        query_parameters=[
+                            bigquery.ScalarQueryParameter("call_id", "STRING", update["call_id"]),
+                            bigquery.ScalarQueryParameter("contact_id", "STRING", update.get("matched_contact_id")),
+                            bigquery.ScalarQueryParameter("account_id", "STRING", update.get("matched_account_id"))
+                        ]
+                    )
+                    self.bq_client.query(update_query, update_job_config)
+                except Exception as e2:
+                    logger.error(f"Error updating call {update.get('call_id')}: {e2}")
 

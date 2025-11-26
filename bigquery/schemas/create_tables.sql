@@ -124,6 +124,26 @@ PARTITION BY DATE(activity_date)
 CLUSTER BY what_id, who_id, owner_id
 OPTIONS(description="Salesforce Tasks, Events, and other activities");
 
+-- 7b. Salesforce Email Messages Table
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.sf_email_messages` (
+  email_message_id STRING NOT NULL OPTIONS(description="Salesforce EmailMessage ID (primary key)"),
+  from_address STRING OPTIONS(description="Sender email address (normalized)"),
+  to_address STRING OPTIONS(description="Recipient email address (normalized)"),
+  cc_address STRING OPTIONS(description="CC email addresses (normalized)"),
+  bcc_address STRING OPTIONS(description="BCC email addresses (normalized)"),
+  subject STRING OPTIONS(description="Email subject"),
+  text_body STRING OPTIONS(description="Plain text body"),
+  html_body STRING OPTIONS(description="HTML body"),
+  message_date TIMESTAMP OPTIONS(description="When email was sent"),
+  related_to_id STRING OPTIONS(description="Related Case/Contact/Lead ID"),
+  created_date TIMESTAMP OPTIONS(description="When created in Salesforce"),
+  last_modified_date TIMESTAMP OPTIONS(description="Last modification"),
+  ingested_at TIMESTAMP OPTIONS(description="When loaded into BigQuery")
+)
+PARTITION BY DATE(message_date)
+CLUSTER BY from_address, related_to_id
+OPTIONS(description="Salesforce EmailMessage records");
+
 -- 8. Dialpad Calls Table
 CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.dialpad_calls` (
   call_id STRING NOT NULL OPTIONS(description="Dialpad call ID (primary key)"),

@@ -37,6 +37,8 @@ import functions_framework
 from datetime import datetime, timezone
 from simple_salesforce import Salesforce
 import requests
+import time
+from utils.retry import retry_with_backoff
 
 # Import project modules (after path is set)
 try:
@@ -338,6 +340,11 @@ def _sync_salesforce_object(
             "table": "sf_activities",
             "fields_list": ["Id", "WhatId", "WhoId", "Subject", "Description", "ActivityDate", "OwnerId", "CreatedDate", "LastModifiedDate"],
             "activity_type": "Event"
+        },
+        "EmailMessage": {
+            "table": "sf_email_messages",
+            "fields_list": ["Id", "FromAddress", "ToAddress", "CcAddress", "BccAddress", "Subject", "TextBody", "HtmlBody", "MessageDate", "RelatedToId", "CreatedDate", "LastModifiedDate"],
+            "activity_type": "EmailMessage"
         }
     }
     
@@ -357,35 +364,138 @@ def _sync_salesforce_object(
     if sync_type == "incremental":
         last_modified = _get_last_modified_date(bq_client, object_type)
         if last_modified:
-            query += f" WHERE LastModifiedDate > {last_modified}"
+            # Format date for SOQL (Salesforce expects ISO format)
+            try:
+                # Ensure proper SOQL date format: YYYY-MM-DDTHH:MM:SSZ
+                # Salesforce SOQL requires datetime literals to be in single quotes
+                if isinstance(last_modified, str):
+                    # Parse and reformat if needed
+                    from dateutil import parser
+                    dt = parser.parse(last_modified)
+                    soql_date = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    query += f" WHERE LastModifiedDate > '{soql_date}'"
+                else:
+                    # Convert to ISO format and quote
+                    if hasattr(last_modified, 'strftime'):
+                        soql_date = last_modified.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    else:
+                        soql_date = str(last_modified)
+                    query += f" WHERE LastModifiedDate > '{soql_date}'"
+            except Exception as e:
+                logger.warning(f"Error formatting date for incremental sync: {e}. Using full sync.")
+                # Fall back to full sync if date parsing fails
+                pass
     
     query += " ORDER BY LastModifiedDate"
     
     try:
-        # Query Salesforce
-        results = sf.query_all(query)
+        # Query Salesforce with retry logic
+        max_retries = 5  # Increased retries for rate limits
+        retry_count = 0
+        results = None
+        
+        while retry_count < max_retries:
+            try:
+                results = sf.query_all(query)
+                break
+            except Exception as e:
+                error_msg = str(e).lower()
+                error_code = None
+                # Try to extract error code from exception
+                if hasattr(e, 'content'):
+                    import json
+                    try:
+                        error_content = json.loads(e.content) if isinstance(e.content, str) else e.content
+                        error_code = error_content[0].get('errorCode', '') if isinstance(error_content, list) else error_content.get('errorCode', '')
+                    except:
+                        pass
+                
+                # Retry on rate limits or temporary errors
+                is_retryable = (
+                    "rate limit" in error_msg or 
+                    "timeout" in error_msg or 
+                    "503" in error_msg or 
+                    "429" in error_msg or
+                    "500" in error_msg or
+                    error_code in ["REQUEST_LIMIT_EXCEEDED", "INVALID_SESSION_ID", "SERVER_UNAVAILABLE"]
+                )
+                
+                if is_retryable:
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        wait_time = min(2 ** retry_count, 60)  # Exponential backoff, max 60s
+                        logger.warning(f"Salesforce API error (attempt {retry_count}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        logger.error(f"Salesforce API error after {max_retries} retries: {e}")
+                        raise
+                else:
+                    # Don't retry on other errors (like invalid query, permissions, etc.)
+                    logger.error(f"Non-retryable Salesforce API error: {e}")
+                    raise
+        
+        if not results:
+            logger.error("Failed to query Salesforce after retries")
+            return rows_synced, errors + 1
         
         # Transform and insert rows
         rows = []
         for record in results['records']:
             try:
                 row = _transform_record(record, object_type, mapping)
-                rows.append(row)
+                # Validate row has required fields before adding
+                if row and row.get(f"{object_type.lower()}_id") or row.get("email_message_id") or row.get("activity_id"):
+                    rows.append(row)
+                else:
+                    logger.warning(f"Skipping {object_type} record {record.get('Id')} - missing required ID field")
+                    errors += 1
             except Exception as e:
-                logger.error(f"Error transforming {object_type} record {record.get('Id')}: {e}")
+                logger.error(f"Error transforming {object_type} record {record.get('Id')}: {e}", exc_info=True)
                 errors += 1
         
-        # Batch insert to BigQuery
+        # Batch insert to BigQuery with retry logic
         if rows:
             batch_size = 1000
             for i in range(0, len(rows), batch_size):
                 batch = rows[i:i + batch_size]
-                try:
-                    bq_client.insert_rows(mapping["table"], batch)
-                    rows_synced += len(batch)
-                except Exception as e:
-                    logger.error(f"Error inserting batch: {e}")
-                    errors += len(batch)
+                max_batch_retries = 3
+                batch_retry_count = 0
+                inserted = False
+                
+                while batch_retry_count < max_batch_retries and not inserted:
+                    try:
+                        bq_client.insert_rows(mapping["table"], batch)
+                        rows_synced += len(batch)
+                        inserted = True
+                        logger.info(f"Successfully inserted {len(batch)} {object_type} records into {mapping['table']}")
+                    except Exception as e:
+                        error_msg = str(e).lower()
+                        # Check if table doesn't exist
+                        if "not found" in error_msg or "does not exist" in error_msg or "404" in error_msg:
+                            logger.error(f"Table {mapping['table']} does not exist. Please create it first.")
+                            errors += len(batch)
+                            break  # Don't retry if table doesn't exist
+                        
+                        batch_retry_count += 1
+                        if batch_retry_count < max_batch_retries:
+                            wait_time = 1 * batch_retry_count
+                            logger.warning(f"BigQuery insert error (attempt {batch_retry_count}/{max_batch_retries}): {e}. Retrying in {wait_time}s...")
+                            time.sleep(wait_time)
+                        else:
+                            logger.error(f"Error inserting batch after {max_batch_retries} retries: {e}")
+                            # Try to insert rows individually to identify problematic records
+                            if len(batch) > 1:
+                                logger.info(f"Attempting individual inserts for {len(batch)} records...")
+                                for single_row in batch:
+                                    try:
+                                        bq_client.insert_rows(mapping["table"], [single_row])
+                                        rows_synced += 1
+                                        errors -= 1  # Reduce error count since we're handling individually
+                                    except Exception as e2:
+                                        logger.error(f"Failed to insert individual record: {e2}")
+                                        errors += 1
+                            else:
+                                errors += len(batch)
         
         return rows_synced, errors
         
@@ -425,6 +535,8 @@ def _transform_record(record: dict, object_type: str, mapping: dict) -> dict:
             "phone": record.get("Phone"),
             "mobile_phone": record.get("MobilePhone"),
             "title": record.get("Title"),
+            "created_date": _parse_sf_datetime(record.get("CreatedDate")),
+            "last_modified_date": _parse_sf_datetime(record.get("LastModifiedDate")),
             "ingested_at": datetime.now(timezone.utc).isoformat()
         })
     elif object_type == "Lead":
@@ -457,15 +569,52 @@ def _transform_record(record: dict, object_type: str, mapping: dict) -> dict:
             "ingested_at": datetime.now(timezone.utc).isoformat()
         })
     elif object_type in ["Task", "Event"]:
+        # Handle Task/Event - truncate description if too long
+        description = record.get("Description")
+        max_desc_length = 100000  # 100KB limit for description
+        if description and len(str(description)) > max_desc_length:
+            logger.warning(f"Truncating Description for {object_type} {record.get('Id')} (length: {len(str(description))})")
+            description = str(description)[:max_desc_length]
+        
         row.update({
             "activity_id": record["Id"],
             "activity_type": mapping.get("activity_type", object_type),
             "what_id": record.get("WhatId"),
             "who_id": record.get("WhoId"),
             "subject": record.get("Subject"),
-            "description": record.get("Description"),
+            "description": description,
             "activity_date": _parse_sf_datetime(record.get("ActivityDate")),
             "owner_id": record.get("OwnerId"),
+            "ingested_at": datetime.now(timezone.utc).isoformat()
+        })
+    elif object_type == "EmailMessage":
+        # Handle EmailMessage - some fields may be very large, truncate if needed
+        text_body = record.get("TextBody")
+        html_body = record.get("HtmlBody")
+        
+        # Truncate very large text fields to avoid BigQuery errors (max 2MB per field)
+        max_text_length = 1000000  # 1MB limit for safety
+        if text_body and len(str(text_body)) > max_text_length:
+            logger.warning(f"Truncating TextBody for EmailMessage {record.get('Id')} (length: {len(str(text_body))})")
+            text_body = str(text_body)[:max_text_length]
+        
+        if html_body and len(str(html_body)) > max_text_length:
+            logger.warning(f"Truncating HtmlBody for EmailMessage {record.get('Id')} (length: {len(str(html_body))})")
+            html_body = str(html_body)[:max_text_length]
+        
+        row.update({
+            "email_message_id": record["Id"],
+            "from_address": record.get("FromAddress", "").lower() if record.get("FromAddress") else None,
+            "to_address": record.get("ToAddress", "").lower() if record.get("ToAddress") else None,
+            "cc_address": record.get("CcAddress", "").lower() if record.get("CcAddress") else None,
+            "bcc_address": record.get("BccAddress", "").lower() if record.get("BccAddress") else None,
+            "subject": record.get("Subject"),
+            "text_body": text_body,
+            "html_body": html_body,
+            "message_date": _parse_sf_datetime(record.get("MessageDate")),
+            "related_to_id": record.get("RelatedToId"),
+            "created_date": _parse_sf_datetime(record.get("CreatedDate")),
+            "last_modified_date": _parse_sf_datetime(record.get("LastModifiedDate")),
             "ingested_at": datetime.now(timezone.utc).isoformat()
         })
     
@@ -494,7 +643,8 @@ def _get_last_modified_date(bq_client: BigQueryClient, object_type: str) -> str:
         "Lead": "sf_leads",
         "Opportunity": "sf_opportunities",
         "Task": "sf_activities",
-        "Event": "sf_activities"
+        "Event": "sf_activities",
+        "EmailMessage": "sf_email_messages"
     }
     
     table = table_map.get(object_type)
