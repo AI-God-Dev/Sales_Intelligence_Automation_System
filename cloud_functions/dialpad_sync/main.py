@@ -206,10 +206,12 @@ def _sync_calls(
     
     # Try multiple endpoint patterns - Dialpad API structure may vary
     # Based on working curl -G command, /calls endpoint works
+    # Try without user_id first (get all calls), then filter by user
     endpoints_to_try = [
-        (f"/calls", "General calls endpoint", True),  # This is the working endpoint
+        (f"/calls", "General calls endpoint (all calls)", False),  # Get all calls first
+        (f"/calls", "General calls endpoint with user_id param", True),  # Then try with user_id
         (f"/users/{user_id}/calls", "User-specific calls endpoint", False),
-        (f"/call_logs", "Call logs endpoint", True),
+        (f"/call_logs", "Call logs endpoint", False),
     ]
     
     calls_data = None
@@ -247,24 +249,38 @@ def _sync_calls(
                 continue
             
             data = response.json()
-            calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
             
-            # If using general endpoint, filter calls by user_id
-            if use_user_param and calls:
-                # Filter calls that belong to this user (check various user_id fields)
+            # Handle different response structures
+            # Response might be: array directly, or {"items": [...]}, or {"calls": [...]}
+            if isinstance(data, list):
+                calls = data
+            else:
+                calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
+            
+            # If we got calls but need to filter by user_id
+            # Check target.id (user who received/made call) from the JSON structure we saw
+            if calls and (not use_user_param or len(calls) > 0):
+                # Filter calls that belong to this user
+                # Check target.id (from the JSON: "target": {"id": "4966031882665984"})
                 filtered_calls = [
                     call for call in calls 
-                    if str(call.get("user_id")) == str(user_id) or 
+                    if str(call.get("target", {}).get("id")) == str(user_id) or 
+                       str(call.get("user_id")) == str(user_id) or 
                        str(call.get("owner_id")) == str(user_id) or
-                       str(call.get("caller_id")) == str(user_id)
+                       str(call.get("caller_id")) == str(user_id) or
+                       str(call.get("contact", {}).get("id")) == str(user_id)
                 ]
-                if not filtered_calls:
-                    logger.warning(f"No calls found for user {user_id} in general endpoint response")
+                
+                # If we got all calls and need to filter, use filtered list
+                if not use_user_param and filtered_calls:
+                    calls = filtered_calls
+                    if isinstance(data, dict):
+                        data["items"] = filtered_calls
+                elif use_user_param and not filtered_calls:
+                    logger.warning(f"No calls found for user {user_id} in response")
                     continue
-                data["items"] = filtered_calls
-                calls = filtered_calls
             
-            if calls or data:  # Accept if we got data structure even if empty
+            if calls or (isinstance(data, dict) and data):  # Accept if we got data structure even if empty
                 calls_data = data
                 working_endpoint = endpoint
                 needs_user_filter = use_user_param
@@ -310,17 +326,22 @@ def _sync_calls(
             if isinstance(data, list):
                 calls = data
             else:
+                # Handle different response structures
+            if isinstance(data, list):
+                calls = data
+            else:
                 calls = data.get("items", []) or data.get("calls", []) or data.get("data", [])
             
-            # If using general endpoint, filter calls by user_id
-            # Check target.id (user who received/made call) or contact.id
-            if needs_user_filter and calls:
+            # If we got all calls, filter by user_id
+            # Check target.id (user who received/made call) from JSON structure
+            if calls and needs_user_filter:
                 calls = [
                     call for call in calls 
                     if str(call.get("target", {}).get("id")) == str(user_id) or 
                        str(call.get("user_id")) == str(user_id) or 
                        str(call.get("owner_id")) == str(user_id) or
-                       str(call.get("caller_id")) == str(user_id)
+                       str(call.get("caller_id")) == str(user_id) or
+                       str(call.get("contact", {}).get("id")) == str(user_id)
                 ]
             
             if not calls:

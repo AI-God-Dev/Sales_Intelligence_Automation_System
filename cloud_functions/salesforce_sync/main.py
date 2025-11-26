@@ -159,22 +159,40 @@ def _get_salesforce_client(settings) -> Salesforce:
     
     # Fallback to username/password if OAuth not available or failed
     logger.info("Using username/password authentication for Salesforce")
-    username = settings.salesforce_username or ""
-    password = settings.salesforce_password or ""
-    security_token = settings.salesforce_security_token or ""
+    username = (settings.salesforce_username or "").strip()
+    password = (settings.salesforce_password or "").strip()
+    security_token = (settings.salesforce_security_token or "").strip()
     
     if not username or not password:
         raise Exception("Neither OAuth credentials (client_id, client_secret, refresh_token) nor username/password are configured. Please set secrets in Secret Manager.")
     
+    # Log authentication attempt (without sensitive data)
+    logger.info(f"Attempting Salesforce authentication with domain={domain}, username={username[:10]}...")
+    
     try:
-        return Salesforce(
+        # simple_salesforce automatically combines password + security_token
+        # For sandbox, ensure domain is "test" and username may need .sandbox suffix
+        sf_client = Salesforce(
             username=username,
             password=password,
             security_token=security_token,
             domain=domain
         )
+        logger.info("Successfully authenticated with Salesforce using username/password")
+        return sf_client
     except Exception as e:
-        logger.error(f"Failed to authenticate with Salesforce using username/password: {e}", exc_info=True)
+        error_msg = str(e)
+        logger.error(f"Failed to authenticate with Salesforce using username/password: {error_msg}", exc_info=True)
+        
+        # Provide helpful error messages
+        if "INVALID_LOGIN" in error_msg:
+            logger.error("INVALID_LOGIN error. Common causes:")
+            logger.error("  1. Username/password incorrect")
+            logger.error("  2. For sandbox: username should end with .sandbox")
+            logger.error("  3. Security token incorrect (reset it in Salesforce)")
+            logger.error("  4. Domain should be 'test' for sandbox, 'login' for production")
+            logger.error(f"  5. Current domain setting: {domain}")
+            logger.error(f"  6. Username format: {username[:20]}...")
         raise
 
 
