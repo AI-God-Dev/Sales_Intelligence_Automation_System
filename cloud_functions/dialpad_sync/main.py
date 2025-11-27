@@ -135,34 +135,46 @@ def _sync_all_calls_workaround(
     last_sync_timestamp_ms = None
     if sync_type == "incremental":
         query = f"""
-        SELECT MAX(call_time) as last_call_time
+        SELECT MAX(call_time) as last_call_time, COUNT(*) as total_calls
         FROM `{bq_client.project_id}.{bq_client.dataset_id}.dialpad_calls`
         """
         try:
             results = bq_client.query(query)
-            if results and results[0].get("last_call_time"):
-                last_sync_time = results[0]["last_call_time"]
-                # Convert to timestamp (milliseconds) for comparison with date_started
-                if isinstance(last_sync_time, str):
-                    dt = datetime.fromisoformat(last_sync_time.replace('Z', '+00:00'))
-                    last_sync_timestamp_ms = int(dt.timestamp() * 1000)
-                elif hasattr(last_sync_time, 'timestamp'):
-                    last_sync_timestamp_ms = int(last_sync_time.timestamp() * 1000)
-                logger.info(f"Last sync timestamp: {last_sync_timestamp_ms} (filtering calls after this)")
+            if results and results[0]:
+                total_calls = results[0].get("total_calls", 0)
+                last_sync_time = results[0].get("last_call_time")
+                
+                # If table is empty, treat as full sync (don't filter by date)
+                if total_calls == 0 or not last_sync_time:
+                    logger.info(f"Table is empty or no last sync time found. Treating as full sync.")
+                    last_sync_timestamp_ms = None
+                else:
+                    # Convert to timestamp (milliseconds) for comparison with date_started
+                    if isinstance(last_sync_time, str):
+                        dt = datetime.fromisoformat(last_sync_time.replace('Z', '+00:00'))
+                        last_sync_timestamp_ms = int(dt.timestamp() * 1000)
+                    elif hasattr(last_sync_time, 'timestamp'):
+                        last_sync_timestamp_ms = int(last_sync_time.timestamp() * 1000)
+                    logger.info(f"Last sync timestamp: {last_sync_timestamp_ms} (filtering calls after this)")
         except Exception as e:
-            logger.warning(f"Could not get last sync time: {e}")
+            logger.warning(f"Could not get last sync time: {e}. Treating as full sync.")
+            last_sync_timestamp_ms = None
     
     # WORKAROUND: Fetch all recent calls with NO filters (this works!)
     # Use /call endpoint - limit=10 works, limit=100+ returns 400
     # Response structure: {"cursor": "...", "items": [...]}
     # Use cursor-based pagination to get all calls
+    # IMPORTANT: Insert in batches during pagination to avoid timeouts
     page_size = 10  # This limit works (100+ returns 400)
-    all_calls_list = []
+    batch_size = 50  # Insert every 50 calls to avoid timeouts
     cursor = None
-    max_iterations = 1000  # Safety limit (10 calls per page = up to 10,000 calls)
+    max_iterations = 500  # Safety limit (10 calls per page = up to 5,000 calls)
+    
+    # Buffer for batching inserts
+    pending_rows = []
     
     try:
-        logger.info(f"Fetching all recent calls (workaround method with cursor pagination)...")
+        logger.info(f"Fetching calls with batch insertion (batch_size={batch_size})...")
         logger.info(f"Using /call endpoint with limit={page_size}")
         
         iteration = 0
@@ -172,7 +184,8 @@ def _sync_all_calls_workaround(
             if cursor:
                 params["cursor"] = cursor
             
-            logger.info(f"Iteration {iteration}: Fetching with limit={page_size}, cursor={'present' if cursor else 'none'}...")
+            if iteration % 50 == 0:  # Log every 50 iterations
+                logger.info(f"Iteration {iteration}: Fetched {calls_synced} calls so far, {len(pending_rows)} pending...")
             
             response = requests.get(
                 f"{base_url}/call",
@@ -180,8 +193,6 @@ def _sync_all_calls_workaround(
                 params=params,
                 timeout=60
             )
-            
-            logger.info(f"Iteration {iteration} - Status: {response.status_code}, URL: {response.url}")
             
             if response.status_code == 200:
                 try:
@@ -197,12 +208,68 @@ def _sync_all_calls_workaround(
                         cursor = data.get("cursor")  # Get cursor for next page
                     
                     if page_calls:
-                        all_calls_list.extend(page_calls)
-                        logger.info(f"Iteration {iteration}: Got {len(page_calls)} calls (total: {len(all_calls_list)})")
+                        # Process each call immediately: filter, transform, and batch for insertion
+                        for call in page_calls:
+                            # Step 1: Filter by date (if incremental sync)
+                            if last_sync_timestamp_ms:
+                                date_started = call.get("date_started")
+                                if date_started:
+                                    # Handle both string and int timestamps
+                                    if isinstance(date_started, str):
+                                        try:
+                                            date_started = int(date_started)
+                                        except ValueError:
+                                            continue
+                                    if date_started < last_sync_timestamp_ms:
+                                        continue  # Skip this call, it's too old
+                            
+                            # Step 2: Filter by user (if specific user requested)
+                            if user_id:
+                                target = call.get("target", {})
+                                call_user_id = None
+                                
+                                if target and target.get("type") == "user":
+                                    call_user_id = str(target.get("id"))
+                                elif call.get("user_id"):
+                                    call_user_id = str(call.get("user_id"))
+                                elif call.get("owner_id"):
+                                    call_user_id = str(call.get("owner_id"))
+                                
+                                if call_user_id != str(user_id):
+                                    continue  # Skip this call, wrong user
+                            
+                            # Step 3: Transform call
+                            try:
+                                # Extract user_id from call data
+                                call_user_id = None
+                                target = call.get("target", {})
+                                if target and target.get("type") == "user":
+                                    call_user_id = str(target.get("id"))
+                                elif call.get("user_id"):
+                                    call_user_id = str(call.get("user_id"))
+                                
+                                row = _transform_call(call, call_user_id)
+                                pending_rows.append(row)
+                                
+                                # Insert in batches to avoid timeouts
+                                if len(pending_rows) >= batch_size:
+                                    try:
+                                        bq_client.insert_rows("dialpad_calls", pending_rows, skip_invalid_rows=True)
+                                        calls_synced += len(pending_rows)
+                                        logger.info(f"✅ Inserted batch of {len(pending_rows)} calls (total: {calls_synced})")
+                                        pending_rows = []  # Clear buffer
+                                    except Exception as e:
+                                        logger.error(f"Error inserting batch: {e}", exc_info=True)
+                                        errors += len(pending_rows)
+                                        pending_rows = []  # Clear buffer to continue
+                                        
+                            except Exception as e:
+                                logger.error(f"Error transforming call {call.get('id')}: {e}")
+                                errors += 1
                         
                         # If no cursor or empty cursor, we're done
                         if not cursor:
-                            logger.info(f"No cursor returned, pagination complete")
+                            logger.info(f"No cursor returned, pagination complete at iteration {iteration}")
                             break
                     else:
                         logger.info(f"Iteration {iteration}: No calls found, stopping")
@@ -217,89 +284,35 @@ def _sync_all_calls_workaround(
                     logger.error("400 Bad Request - API may not support this request format")
                 break
         
-        all_calls = all_calls_list
-        logger.info(f"✅ Fetched {len(all_calls)} total calls from Dialpad API (across {iteration} iterations)")
+        # Insert any remaining rows in the buffer
+        if pending_rows:
+            try:
+                bq_client.insert_rows("dialpad_calls", pending_rows, skip_invalid_rows=True)
+                calls_synced += len(pending_rows)
+                logger.info(f"✅ Inserted final batch of {len(pending_rows)} calls (total: {calls_synced})")
+            except Exception as e:
+                logger.error(f"Error inserting final batch: {e}", exc_info=True)
+                errors += len(pending_rows)
         
-        if not all_calls:
-            logger.warning(f"⚠️ No calls found in API response after pagination")
-            logger.warning(f"Total iterations: {iteration}")
-        else:
-            logger.info(f"Processing {len(all_calls)} calls...")
+        logger.info(f"✅ Completed: Fetched and processed {calls_synced} calls across {iteration} iterations")
         
-        if all_calls:
-            # Step 1: Filter by date locally (if incremental sync)
-            if last_sync_timestamp_ms:
-                filtered_calls = []
-                for call in all_calls:
-                    # Check date_started field (timestamp in milliseconds)
-                    date_started = call.get("date_started")
-                    if date_started:
-                        # Handle both string and int timestamps
-                        if isinstance(date_started, str):
-                            try:
-                                date_started = int(date_started)
-                            except ValueError:
-                                continue
-                        if date_started >= last_sync_timestamp_ms:
-                            filtered_calls.append(call)
-                all_calls = filtered_calls
-                logger.info(f"Filtered to {len(all_calls)} calls after timestamp {last_sync_timestamp_ms}")
-            
-            # Step 2: Filter by user locally (if specific user requested)
-            if user_id:
-                user_filtered_calls = []
-                for call in all_calls:
-                    # Check multiple possible fields for user identification
-                    target = call.get("target", {})
-                    call_user_id = None
-                    
-                    if target and target.get("type") == "user":
-                        call_user_id = str(target.get("id"))
-                    elif call.get("user_id"):
-                        call_user_id = str(call.get("user_id"))
-                    elif call.get("owner_id"):
-                        call_user_id = str(call.get("owner_id"))
-                    
-                    if call_user_id == str(user_id):
-                        user_filtered_calls.append(call)
-                
-                all_calls = user_filtered_calls
-                logger.info(f"Filtered to {len(all_calls)} calls for user {user_id}")
-            
-            # Step 3: Transform and insert calls
-            if all_calls:
-                rows = []
-                for call in all_calls:
-                    try:
-                        # Extract user_id from call data
-                        call_user_id = None
-                        target = call.get("target", {})
-                        if target and target.get("type") == "user":
-                            call_user_id = str(target.get("id"))
-                        elif call.get("user_id"):
-                            call_user_id = str(call.get("user_id"))
-                        
-                        row = _transform_call(call, call_user_id)
-                        rows.append(row)
-                    except Exception as e:
-                        logger.error(f"Error transforming call {call.get('id')}: {e}")
-                        errors += 1
-                
-                if rows:
-                    try:
-                        bq_client.insert_rows("dialpad_calls", rows)
-                        calls_synced = len(rows)
-                        logger.info(f"✅ Successfully inserted {calls_synced} calls using workaround method")
-                    except Exception as e:
-                        logger.error(f"Error inserting calls: {e}")
-                        errors += len(rows)
-            else:
-                logger.info("No calls to sync after filtering")
+        if calls_synced == 0 and iteration > 0:
+            logger.warning(f"⚠️ Processed {iteration} iterations but no calls were inserted (may have been filtered out)")
             
     except Exception as e:
         logger.error(f"Error fetching all calls: {e}", exc_info=True)
         errors += 1
+        # Try to insert any pending rows before failing
+        if pending_rows:
+            try:
+                bq_client.insert_rows("dialpad_calls", pending_rows, skip_invalid_rows=True)
+                calls_synced += len(pending_rows)
+                logger.info(f"✅ Inserted {len(pending_rows)} pending calls before error")
+            except Exception as insert_error:
+                logger.error(f"Failed to insert pending rows: {insert_error}")
+                errors += len(pending_rows)
     
+    logger.info(f"Sync completed: {calls_synced} calls synced, {errors} errors")
     return calls_synced, errors
 
 
