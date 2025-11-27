@@ -22,135 +22,410 @@ import pandas as pd
 
 # Inject custom CSS for professional styling
 def inject_custom_css():
-    """Inject professional custom CSS styling."""
+    """Inject professional custom CSS styling with modern design system."""
     css = """
     <style>
-    /* Main styling improvements */
-    .main {
-        padding: 2rem 1rem;
+    /* ===== DESIGN SYSTEM ===== */
+    :root {
+        --primary: #2563eb;
+        --primary-dark: #1e40af;
+        --primary-light: #3b82f6;
+        --secondary: #64748b;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --error: #ef4444;
+        --info: #3b82f6;
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #f1f5f9;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-tertiary: #94a3b8;
+        --border: #e2e8f0;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        --radius-sm: 0.375rem;
+        --radius-md: 0.5rem;
+        --radius-lg: 0.75rem;
+        --radius-xl: 1rem;
     }
     
-    /* Professional header styling */
+    /* ===== GLOBAL RESET & BASE ===== */
+    * {
+        box-sizing: border-box;
+    }
+    
+    .main {
+        padding: 2rem 2.5rem;
+        background: var(--bg-secondary);
+        min-height: 100vh;
+    }
+    
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 1600px;
+    }
+    
+    /* ===== TYPOGRAPHY ===== */
     h1 {
-        color: #1f77b4;
-        font-weight: 700;
-        margin-bottom: 1.5rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 3px solid #1f77b4;
+        color: var(--text-primary);
+        font-weight: 800;
+        font-size: 2.5rem;
+        line-height: 1.2;
+        margin-bottom: 0.75rem;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
     h2 {
-        color: #2c3e50;
+        color: var(--text-primary);
+        font-weight: 700;
+        font-size: 1.875rem;
+        margin-top: 2.5rem;
+        margin-bottom: 1.25rem;
+        letter-spacing: -0.01em;
+    }
+    
+    h3 {
+        color: var(--text-primary);
         font-weight: 600;
+        font-size: 1.5rem;
         margin-top: 2rem;
         margin-bottom: 1rem;
     }
     
-    /* Sidebar styling */
+    p {
+        color: var(--text-secondary);
+        line-height: 1.7;
+    }
+    
+    /* ===== SIDEBAR ===== */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        box-shadow: var(--shadow-xl);
     }
     
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: white;
+        color: #e2e8f0;
     }
     
-    /* Metric cards enhancement */
-    [data-testid="stMetricValue"] {
-        font-size: 2rem;
-        font-weight: 700;
+    [data-testid="stSidebar"] .stSelectbox label {
+        color: #cbd5e1 !important;
+        font-weight: 500;
     }
     
-    /* Button styling */
-    .stButton > button {
-        background: linear-gradient(90deg, #1f77b4 0%, #2c5aa0 100%);
-        color: white;
-        border-radius: 6px;
-        padding: 0.5rem 1.5rem;
+    [data-testid="stSidebar"] .stTextInput label {
+        color: #cbd5e1 !important;
+    }
+    
+    /* ===== METRIC CARDS ===== */
+    .metric-card {
+        background: var(--bg-primary);
+        padding: 2rem;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        height: 100%;
+    }
+    
+    .metric-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .metric-card.success::before {
+        background: linear-gradient(90deg, var(--success) 0%, #34d399 100%);
+    }
+    
+    .metric-card.warning::before {
+        background: linear-gradient(90deg, var(--warning) 0%, #fbbf24 100%);
+    }
+    
+    .metric-card.info::before {
+        background: linear-gradient(90deg, var(--info) 0%, #60a5fa 100%);
+    }
+    
+    .metric-label {
+        font-size: 0.875rem;
+        color: var(--text-tertiary);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
         font-weight: 600;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        line-height: 1;
+        margin-bottom: 0.5rem;
+        font-variant-numeric: tabular-nums;
+    }
+    
+    .metric-icon {
+        font-size: 1.5rem;
+        opacity: 0.8;
+    }
+    
+    /* ===== BUTTONS ===== */
+    .stButton > button {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        color: white;
+        border-radius: var(--radius-md);
+        padding: 0.75rem 1.75rem;
+        font-weight: 600;
+        font-size: 0.9375rem;
         border: none;
-        transition: all 0.3s;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-md);
+        cursor: pointer;
     }
     
     .stButton > button:hover {
-        background: linear-gradient(90deg, #2c5aa0 0%, #1f77b4 100%);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
     }
     
-    /* Info boxes */
+    .stButton > button:active {
+        transform: translateY(0);
+    }
+    
+    /* ===== ALERT BOXES ===== */
     .stInfo {
-        background: #e7f3ff;
-        border-left: 4px solid #1f77b4;
-        border-radius: 4px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        border-left: 4px solid var(--info);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        box-shadow: var(--shadow-sm);
     }
     
     .stSuccess {
-        background: #d4edda;
-        border-left: 4px solid #27ae60;
-        border-radius: 4px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        border-left: 4px solid var(--success);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        box-shadow: var(--shadow-sm);
     }
     
     .stWarning {
-        background: #fff3cd;
-        border-left: 4px solid #f39c12;
-        border-radius: 4px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+        border-left: 4px solid var(--warning);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        box-shadow: var(--shadow-sm);
     }
     
     .stError {
-        background: #f8d7da;
-        border-left: 4px solid #e74c3c;
-        border-radius: 4px;
-        padding: 1rem;
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        border-left: 4px solid var(--error);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        box-shadow: var(--shadow-sm);
     }
     
-    /* Dataframe styling */
+    /* ===== DATA TABLES ===== */
     .dataframe {
-        border-radius: 8px;
+        border-radius: var(--radius-lg);
         overflow: hidden;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border);
+        background: var(--bg-primary);
     }
     
     .dataframe thead {
-        background: #2c3e50;
+        background: linear-gradient(135deg, var(--text-primary) 0%, #1e293b 100%);
         color: white;
     }
     
-    /* Input fields */
-    .stTextInput > div > div > input {
-        border-radius: 6px;
-        border: 2px solid #dee2e6;
-        padding: 0.5rem;
+    .dataframe thead th {
+        padding: 1rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
     }
     
-    .stTextInput > div > div > input:focus {
-        border-color: #1f77b4;
+    .dataframe tbody tr {
+        transition: background-color 0.2s;
+    }
+    
+    .dataframe tbody tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+    
+    .dataframe tbody td {
+        padding: 0.875rem 1rem;
+        border-bottom: 1px solid var(--border);
+    }
+    
+    /* ===== INPUT FIELDS ===== */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea,
+    .stSelectbox > div > div > select {
+        border-radius: var(--radius-md);
+        border: 2px solid var(--border);
+        padding: 0.75rem 1rem;
+        transition: all 0.2s;
+        background: var(--bg-primary);
+    }
+    
+    .stTextInput > div > div > input:focus,
+    .stTextArea > div > div > textarea:focus,
+    .stSelectbox > div > div > select:focus {
+        border-color: var(--primary);
         outline: none;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     }
     
-    /* Professional card styling */
-    .metric-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 4px solid #1f77b4;
-        margin-bottom: 1rem;
+    /* ===== CARDS & CONTAINERS ===== */
+    .content-card {
+        background: var(--bg-primary);
+        padding: 2rem;
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border);
+        margin-bottom: 2rem;
     }
     
-    /* Hide Streamlit branding */
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--border);
+    }
+    
+    /* ===== LOADING STATES ===== */
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+    }
+    
+    .loading-skeleton {
+        background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
+        background-size: 200% 100%;
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        border-radius: var(--radius-md);
+        height: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--bg-secondary);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--text-tertiary);
+    }
+    
+    /* ===== HIDE STREAMLIT BRANDING ===== */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
+    .stDeployButton {display: none;}
     
-    /* Professional spacing */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .fade-in {
+        animation: fadeIn 0.5s ease-out;
+    }
+    
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+        .main {
+            padding: 1rem;
+        }
+        
+        h1 {
+            font-size: 2rem;
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+        }
+    }
+    
+    /* ===== UTILITY CLASSES ===== */
+    .text-gradient {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .badge-success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .badge-warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .badge-error {
+        background: #fee2e2;
+        color: #991b1b;
     }
     </style>
     """
@@ -199,11 +474,20 @@ if 'bq_client' not in st.session_state:
 # Initialize BigQuery client if available
 if BQ_AVAILABLE and st.session_state.bq_client is None:
     try:
+        import logging
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+        logger.info("Initializing BigQuery client...")
         st.session_state.bq_client = BigQueryClient()
+        logger.info("BigQuery client initialized successfully")
     except Exception as e:
+        import traceback
+        error_details = f"{str(e)}\n{traceback.format_exc()}"
         st.session_state.bq_client = None
         # Store error message for display
-        st.session_state.bq_error = str(e)
+        st.session_state.bq_error = error_details
+        import logging
+        logging.error(f"BigQuery client initialization failed: {error_details}")
 
 # Helper functions
 def get_function_url(function_name: str) -> str:
@@ -276,12 +560,16 @@ def verify_google_token(token: str) -> Optional[str]:
 
 # Sidebar navigation with professional styling
 st.sidebar.markdown("""
-<div style='text-align: center; padding: 1rem 0;'>
-    <h1 style='color: white; font-size: 1.8rem; margin: 0;'>📊 Sales Intelligence</h1>
-    <p style='color: #ecf0f1; font-size: 0.9rem; margin: 0.5rem 0 0 0;'>AI-Powered Sales Automation</p>
+<div style='text-align: center; padding: 2rem 1rem 1.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem;'>
+    <div style='font-size: 2.5rem; margin-bottom: 0.5rem;'>📊</div>
+    <h1 style='color: white; font-size: 1.5rem; font-weight: 700; margin: 0; letter-spacing: -0.02em;'>
+        Sales Intelligence
+    </h1>
+    <p style='color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0 0 0; font-weight: 400;'>
+        AI-Powered Sales Automation
+    </p>
 </div>
 """, unsafe_allow_html=True)
-st.sidebar.markdown("---")
 
 # Authentication
 if not st.session_state.authenticated:
@@ -303,22 +591,53 @@ if not st.session_state.authenticated:
         else:
             st.sidebar.error("Please enter a valid email address")
 else:
-    st.sidebar.success(f"Logged in as: {st.session_state.user_email}")
-    if st.sidebar.button("Logout"):
+    st.sidebar.markdown(f"""
+    <div style='background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;'>
+        <div style='color: #cbd5e1; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;'>
+            Logged in as
+        </div>
+        <div style='color: white; font-weight: 600; font-size: 0.9375rem; word-break: break-all;'>
+            {st.session_state.user_email}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.sidebar.button("🚪 Logout", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.user_email = None
         st.rerun()
 
 if not st.session_state.authenticated:
     st.markdown("""
-    <div style='text-align: center; padding: 4rem 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 1rem;'>Sales Intelligence & Automation System</h1>
-        <p style='font-size: 1.2rem; color: #7f8c8d; margin-bottom: 2rem;'>
-            AI-Powered Sales Intelligence Platform
+    <div style='text-align: center; padding: 6rem 2rem; max-width: 600px; margin: 0 auto;'>
+        <div style='font-size: 5rem; margin-bottom: 1.5rem;'>📊</div>
+        <h1 class='text-gradient' style='margin-bottom: 1rem; font-size: 3rem;'>
+            Sales Intelligence
+        </h1>
+        <p style='font-size: 1.25rem; color: var(--text-secondary); margin-bottom: 3rem; line-height: 1.6;'>
+            AI-Powered Sales Intelligence & Automation Platform
         </p>
+        <div style='background: var(--bg-primary); padding: 2rem; border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); border: 1px solid var(--border);'>
+            <h3 style='color: var(--text-primary); margin-bottom: 1rem;'>Welcome Back</h3>
+            <p style='color: var(--text-secondary); margin-bottom: 2rem;'>
+                Please log in using the sidebar to access your dashboard
+            </p>
+            <div style='display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem;'>
+                <div style='flex: 1; min-width: 150px; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);'>
+                    <div style='font-size: 2rem; margin-bottom: 0.5rem;'>📈</div>
+                    <strong style='color: var(--text-primary); font-size: 0.875rem;'>Real-time Analytics</strong>
+                </div>
+                <div style='flex: 1; min-width: 150px; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);'>
+                    <div style='font-size: 2rem; margin-bottom: 0.5rem;'>🤖</div>
+                    <strong style='color: var(--text-primary); font-size: 0.875rem;'>AI-Powered Insights</strong>
+                </div>
+                <div style='flex: 1; min-width: 150px; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);'>
+                    <div style='font-size: 2rem; margin-bottom: 0.5rem;'>⚡</div>
+                    <strong style='color: var(--text-primary); font-size: 0.875rem;'>Smart Automation</strong>
+                </div>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
-    st.info("👆 Please log in using the sidebar to access the dashboard.")
     st.stop()
 
 # Navigation
@@ -338,9 +657,11 @@ page = st.sidebar.selectbox(
 # Dashboard Page
 if page == "Dashboard":
     st.markdown("""
-    <div style='margin-bottom: 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>📊 Sales Intelligence Dashboard</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Real-time insights and metrics for your sales pipeline</p>
+    <div class='fade-in' style='margin-bottom: 3rem;'>
+        <h1>📊 Sales Intelligence Dashboard</h1>
+        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
+            Real-time insights and metrics for your sales pipeline
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -389,55 +710,105 @@ if page == "Dashboard":
             total_accounts_count = high_priority_count = unmatched_count = opportunities_count = 0
     else:
         # Show helpful message when BigQuery is not available
-        st.info("""
-        💡 **BigQuery Client Not Available**
+        error_msg = ""
+        if 'bq_error' in st.session_state and st.session_state.bq_error:
+            error_msg = f"\n\n**Error Details:** `{st.session_state.bq_error}`"
         
-        The app is running in demo mode. To enable full functionality:
-        1. Set up GCP credentials: `gcloud auth application-default login`
-        2. Ensure the service account has BigQuery access
-        3. Restart the application
-        
-        You can still explore the interface, but data will show as 0 until BigQuery is connected.
-        """)
+        st.markdown(f"""
+        <div class='content-card fade-in' style='background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid var(--warning);'>
+            <div style='display: flex; align-items: start; gap: 1rem;'>
+                <div style='font-size: 2rem;'>⚠️</div>
+                <div style='flex: 1;'>
+                    <h3 style='margin-top: 0; color: var(--text-primary); margin-bottom: 0.75rem;'>
+                        BigQuery Client Not Available
+                    </h3>
+                    <p style='color: var(--text-secondary); margin-bottom: 1rem;'>
+                        The app is running in demo mode. To enable full functionality:
+                    </p>
+                    <ol style='color: var(--text-secondary); margin-left: 1.5rem; line-height: 2;'>
+                        <li>Set up GCP credentials: <code style='background: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;'>gcloud auth application-default login</code></li>
+                        <li>Ensure the service account has BigQuery access</li>
+                        <li>Restart the application</li>
+                    </ol>
+                    {f'<div style="margin-top: 1rem; padding: 1rem; background: white; border-radius: var(--radius-md); border-left: 3px solid var(--error);"><strong style="color: var(--error);">Error Details:</strong><pre style="margin: 0.5rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary); overflow-x: auto;">{error_msg[:500]}</pre></div>' if error_msg else ''}
+                    <p style='color: var(--text-secondary); margin-top: 1rem; margin-bottom: 0; font-size: 0.875rem;'>
+                        You can still explore the interface, but data will show as 0 until BigQuery is connected.
+                    </p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         total_accounts_count = high_priority_count = unmatched_count = opportunities_count = 0
     
-    # Professional metric cards
+    # Professional metric cards with icons
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
-        <div class='metric-card'>
-            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>Total Accounts</div>
-            <div style='font-size: 2rem; font-weight: 700; color: #1f77b4;'>{total_accounts_count:,}</div>
+        <div class='metric-card fade-in'>
+            <div class='metric-label'>
+                <span class='metric-icon'>🏢</span>
+                <span>Total Accounts</span>
+            </div>
+            <div class='metric-value'>{total_accounts_count:,}</div>
+            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
+                Active accounts in system
+            </div>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown(f"""
-        <div class='metric-card'>
-            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>High Priority</div>
-            <div style='font-size: 2rem; font-weight: 700; color: #27ae60;'>{high_priority_count:,}</div>
-            <div style='font-size: 0.8rem; color: #7f8c8d; margin-top: 0.25rem;'>Today</div>
+        <div class='metric-card success fade-in'>
+            <div class='metric-label'>
+                <span class='metric-icon'>🎯</span>
+                <span>High Priority</span>
+            </div>
+            <div class='metric-value' style='color: var(--success);'>{high_priority_count:,}</div>
+            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
+                Score ≥ 70 • Today
+            </div>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown(f"""
-        <div class='metric-card'>
-            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>Unmatched Emails</div>
-            <div style='font-size: 2rem; font-weight: 700; color: #f39c12;'>{unmatched_count:,}</div>
+        <div class='metric-card warning fade-in'>
+            <div class='metric-label'>
+                <span class='metric-icon'>📧</span>
+                <span>Unmatched Emails</span>
+            </div>
+            <div class='metric-value' style='color: var(--warning);'>{unmatched_count:,}</div>
+            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
+                Last 90 days
+            </div>
         </div>
         """, unsafe_allow_html=True)
     with col4:
         st.markdown(f"""
-        <div class='metric-card'>
-            <div style='font-size: 0.9rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;'>Open Opportunities</div>
-            <div style='font-size: 2rem; font-weight: 700; color: #3498db;'>{opportunities_count:,}</div>
+        <div class='metric-card info fade-in'>
+            <div class='metric-label'>
+                <span class='metric-icon'>💼</span>
+                <span>Open Opportunities</span>
+            </div>
+            <div class='metric-value' style='color: var(--info);'>{opportunities_count:,}</div>
+            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
+                Active in pipeline
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    st.markdown("<div style='margin: 3rem 0;'></div>", unsafe_allow_html=True)
     
-    # Top priority accounts
-    st.subheader("🎯 Top Priority Accounts (Today)")
+    # Top priority accounts section
+    st.markdown("""
+    <div class='section-header'>
+        <div>
+            <h2 style='margin: 0;'>🎯 Top Priority Accounts</h2>
+            <p style='color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.9375rem;'>
+                Accounts requiring immediate attention today
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     if st.button("Refresh Account Scores"):
         with st.spinner("Refreshing account scores..."):
@@ -489,9 +860,48 @@ gcloud functions deploy account-scoring \\
             top_accounts = query_bigquery(top_accounts_query)
             if top_accounts:
                 df = pd.DataFrame(top_accounts)
-                st.dataframe(df, use_container_width=True)
+                st.markdown("""
+                <div class='content-card fade-in'>
+                """, unsafe_allow_html=True)
+                st.dataframe(
+                    df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "priority_score": st.column_config.NumberColumn(
+                            "Priority Score",
+                            help="Account priority score (0-100)",
+                            format="%.1f",
+                            min_value=0,
+                            max_value=100,
+                        ),
+                        "budget_likelihood": st.column_config.NumberColumn(
+                            "Budget Likelihood",
+                            help="Likelihood of budget availability (0-100)",
+                            format="%.1f",
+                            min_value=0,
+                            max_value=100,
+                        ),
+                        "engagement_score": st.column_config.NumberColumn(
+                            "Engagement",
+                            help="Recent engagement score (0-100)",
+                            format="%.1f",
+                            min_value=0,
+                            max_value=100,
+                        ),
+                    }
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
             else:
-                st.info("No account scores available for today. Click 'Refresh Account Scores' to generate.")
+                st.markdown("""
+                <div class='content-card fade-in' style='text-align: center; padding: 3rem 2rem;'>
+                    <div style='font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;'>📊</div>
+                    <h3 style='color: var(--text-primary); margin-bottom: 0.5rem;'>No Account Scores Available</h3>
+                    <p style='color: var(--text-secondary); margin-bottom: 1.5rem;'>
+                        Account scores are generated daily. Click the button above to refresh scores.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Error loading accounts: {str(e)}")
     else:
@@ -510,22 +920,49 @@ gcloud functions deploy account-scoring \\
 # Account Scoring Page
 elif page == "Account Scoring":
     st.markdown("""
-    <div style='margin-bottom: 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>🎯 Account Scoring</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>AI-powered account prioritization and scoring</p>
+    <div class='fade-in' style='margin-bottom: 3rem;'>
+        <h1>🎯 Account Scoring</h1>
+        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
+            AI-powered account prioritization and scoring
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
-    <div style='background: #e7f3ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #1f77b4; margin-bottom: 2rem;'>
-        <h4 style='margin-top: 0; color: #2c3e50;'>Account Scoring Methodology</h4>
-        <p style='margin-bottom: 0.5rem;'>Account scores are generated daily using AI analysis of:</p>
-        <ul style='margin-bottom: 0;'>
-            <li><strong>Recent email engagement</strong> - Response rates and interaction patterns</li>
-            <li><strong>Call activity and sentiment</strong> - Call frequency and emotional signals</li>
-            <li><strong>Open opportunities</strong> - Pipeline health and deal progression</li>
-            <li><strong>Recent activities</strong> - Overall account activity and touchpoints</li>
-        </ul>
+    <div class='content-card fade-in' style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid var(--info); margin-bottom: 2rem;'>
+        <h3 style='margin-top: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;'>
+            <span>📈</span>
+            <span>Account Scoring Methodology</span>
+        </h3>
+        <p style='margin-bottom: 1rem; color: var(--text-secondary);'>
+            Account scores are generated daily using AI analysis of:
+        </p>
+        <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;'>
+            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
+                <strong style='color: var(--text-primary);'>📧 Email Engagement</strong>
+                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
+                    Response rates and interaction patterns
+                </p>
+            </div>
+            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
+                <strong style='color: var(--text-primary);'>📞 Call Activity</strong>
+                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
+                    Call frequency and sentiment analysis
+                </p>
+            </div>
+            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
+                <strong style='color: var(--text-primary);'>💼 Opportunities</strong>
+                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
+                    Pipeline health and deal progression
+                </p>
+            </div>
+            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
+                <strong style='color: var(--text-primary);'>⚡ Activity Level</strong>
+                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
+                    Overall account activity and touchpoints
+                </p>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -610,22 +1047,31 @@ elif page == "Account Scoring":
 # Natural Language Query Page
 elif page == "Natural Language Query":
     st.markdown("""
-    <div style='margin-bottom: 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>💬 Natural Language Query</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Ask questions about your sales data in plain English</p>
+    <div class='fade-in' style='margin-bottom: 3rem;'>
+        <h1>💬 Natural Language Query</h1>
+        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
+            Ask questions about your sales data in plain English
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
-    <div style='background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem;'>
-        <h4 style='margin-top: 0; color: #2c3e50;'>💡 Natural Language Query</h4>
-        <p>Ask questions about your sales data in plain English. The AI will convert your question into SQL and execute it.</p>
-        <p style='margin-bottom: 0.5rem;'><strong>Example Queries:</strong></p>
-        <ul style='margin-bottom: 0;'>
-            <li>"Show me accounts with high engagement in the last week"</li>
-            <li>"Which accounts are discussing budget for 2026?"</li>
-            <li>"Find contacts who haven't been called in 30 days"</li>
-        </ul>
+    <div class='content-card fade-in' style='background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); margin-bottom: 2rem;'>
+        <h3 style='margin-top: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;'>
+            <span>💡</span>
+            <span>How It Works</span>
+        </h3>
+        <p style='color: var(--text-secondary); margin-bottom: 1rem;'>
+            Ask questions about your sales data in plain English. The AI will convert your question into SQL and execute it.
+        </p>
+        <div style='background: white; padding: 1.25rem; border-radius: var(--radius-md); border-left: 3px solid var(--primary);'>
+            <strong style='color: var(--text-primary); display: block; margin-bottom: 0.75rem;'>Example Queries:</strong>
+            <ul style='margin: 0; padding-left: 1.5rem; color: var(--text-secondary); line-height: 2;'>
+                <li>"Show me accounts with high engagement in the last week"</li>
+                <li>"Which accounts are discussing budget for 2026?"</li>
+                <li>"Find contacts who haven't been called in 30 days"</li>
+            </ul>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -662,22 +1108,31 @@ elif page == "Natural Language Query":
 # Semantic Search Page (NEW)
 elif page == "Semantic Search":
     st.markdown("""
-    <div style='margin-bottom: 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>🔍 Semantic Search</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>AI-powered intent-based search across all communications</p>
+    <div class='fade-in' style='margin-bottom: 3rem;'>
+        <h1>🔍 Semantic Search</h1>
+        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
+            AI-powered intent-based search across all communications
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
-    <div style='background: #f0f9ff; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #3498db; margin-bottom: 2rem;'>
-        <h4 style='margin-top: 0; color: #2c3e50;'>🔍 AI-Powered Semantic Search</h4>
-        <p>Find accounts, emails, or calls by intent using advanced vector search technology. Search by meaning, not just keywords.</p>
-        <p style='margin-bottom: 0.5rem;'><strong>Example Searches:</strong></p>
-        <ul style='margin-bottom: 0;'>
-            <li>"budget discussions for 2026" - Find budget-related conversations</li>
-            <li>"renewal concerns" - Discover accounts worried about renewals</li>
-            <li>"pricing negotiations" - Locate pricing discussion threads</li>
-        </ul>
+    <div class='content-card fade-in' style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid var(--info); margin-bottom: 2rem;'>
+        <h3 style='margin-top: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;'>
+            <span>🔍</span>
+            <span>AI-Powered Semantic Search</span>
+        </h3>
+        <p style='color: var(--text-secondary); margin-bottom: 1rem;'>
+            Find accounts, emails, or calls by intent using advanced vector search technology. Search by meaning, not just keywords.
+        </p>
+        <div style='background: white; padding: 1.25rem; border-radius: var(--radius-md); border-left: 3px solid var(--info);'>
+            <strong style='color: var(--text-primary); display: block; margin-bottom: 0.75rem;'>Example Searches:</strong>
+            <ul style='margin: 0; padding-left: 1.5rem; color: var(--text-secondary); line-height: 2;'>
+                <li><strong>"budget discussions for 2026"</strong> - Find budget-related conversations</li>
+                <li><strong>"renewal concerns"</strong> - Discover accounts worried about renewals</li>
+                <li><strong>"pricing negotiations"</strong> - Locate pricing discussion threads</li>
+            </ul>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -712,9 +1167,11 @@ elif page == "Semantic Search":
 # Unmatched Emails Page
 elif page == "Unmatched Emails":
     st.markdown("""
-    <div style='margin-bottom: 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>📧 Unmatched Emails</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Create leads from emails with unknown contacts</p>
+    <div class='fade-in' style='margin-bottom: 3rem;'>
+        <h1>📧 Unmatched Emails</h1>
+        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
+            Create leads from emails with unknown contacts
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -793,9 +1250,11 @@ elif page == "Unmatched Emails":
 # Account Details Page
 elif page == "Account Details":
     st.markdown("""
-    <div style='margin-bottom: 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>🏢 Account Details</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>Complete account information and interaction history</p>
+    <div class='fade-in' style='margin-bottom: 3rem;'>
+        <h1>🏢 Account Details</h1>
+        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
+            Complete account information and interaction history
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -923,9 +1382,11 @@ elif page == "Account Details":
 # Email Threads Page
 elif page == "Email Threads":
     st.markdown("""
-    <div style='margin-bottom: 2rem;'>
-        <h1 style='color: #1f77b4; margin-bottom: 0.5rem; border-bottom: 3px solid #1f77b4; padding-bottom: 0.5rem;'>📬 Email Threads</h1>
-        <p style='color: #7f8c8d; font-size: 1.1rem; margin-top: 0.5rem;'>View conversations and generate AI-powered replies</p>
+    <div class='fade-in' style='margin-bottom: 3rem;'>
+        <h1>📬 Email Threads</h1>
+        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
+            View conversations and generate AI-powered replies
+        </p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -993,12 +1454,14 @@ elif page == "Email Threads":
             st.warning("BigQuery client not available")
 
 # Professional Footer
-st.sidebar.markdown("---")
 st.sidebar.markdown("""
-<div style='text-align: center; padding: 1rem 0; color: #ecf0f1;'>
-    <p style='font-weight: 600; margin-bottom: 0.5rem;'>Sales Intelligence System</p>
-    <p style='font-size: 0.85rem; color: #95a5a6; margin: 0;'>Version 2.0</p>
-    <p style='font-size: 0.8rem; color: #7f8c8d; margin-top: 0.5rem;'>Phase 2 & 3 Complete</p>
+<div style='position: fixed; bottom: 0; left: 0; right: 0; padding: 1.5rem 1rem; background: rgba(15, 23, 42, 0.5); border-top: 1px solid rgba(255,255,255,0.1);'>
+    <div style='text-align: center; color: #94a3b8;'>
+        <p style='font-weight: 600; margin-bottom: 0.25rem; color: #cbd5e1; font-size: 0.875rem;'>
+            Sales Intelligence System
+        </p>
+        <p style='font-size: 0.75rem; margin: 0;'>Version 2.0 • Phase 2 & 3</p>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
