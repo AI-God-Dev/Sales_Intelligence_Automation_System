@@ -22,153 +22,179 @@ import pandas as pd
 
 # Inject custom CSS for professional styling
 def inject_custom_css():
-    """Inject professional custom CSS styling with modern design system."""
+    """Inject simple, clean, professional custom CSS styling."""
     css = """
     <style>
-    /* ===== DESIGN SYSTEM ===== */
+    /* ===== SIMPLE DESIGN SYSTEM ===== */
     :root {
         --primary: #2563eb;
-        --primary-dark: #1e40af;
-        --primary-light: #3b82f6;
-        --secondary: #64748b;
         --success: #10b981;
         --warning: #f59e0b;
         --error: #ef4444;
-        --info: #3b82f6;
+        
         --bg-primary: #ffffff;
-        --bg-secondary: #f8fafc;
-        --bg-tertiary: #f1f5f9;
-        --text-primary: #0f172a;
-        --text-secondary: #475569;
-        --text-tertiary: #94a3b8;
-        --border: #e2e8f0;
-        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        --radius-sm: 0.375rem;
-        --radius-md: 0.5rem;
-        --radius-lg: 0.75rem;
-        --radius-xl: 1rem;
+        --bg-secondary: #f3f4f6;
+        
+        --text-primary: #000000;
+        --text-secondary: #374151;
+        
+        --border: #d1d5db;
     }
     
-    /* ===== GLOBAL RESET & BASE ===== */
-    * {
-        box-sizing: border-box;
-    }
-    
+    /* ===== BASE STYLES ===== */
     .main {
-        padding: 2rem 2.5rem;
-        background: var(--bg-secondary);
-        min-height: 100vh;
+        padding: 2rem;
+        background: #ffffff;
     }
     
     .block-container {
-        padding-top: 2rem;
-        padding-bottom: 3rem;
-        max-width: 1600px;
+        max-width: 1200px;
+        background: #ffffff;
     }
     
-    /* ===== TYPOGRAPHY ===== */
-    h1 {
-        color: var(--text-primary);
-        font-weight: 800;
-        font-size: 2.5rem;
-        line-height: 1.2;
-        margin-bottom: 0.75rem;
-        letter-spacing: -0.02em;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    
-    h2 {
-        color: var(--text-primary);
+    /* Main content text - high contrast */
+    .main h1 {
+        color: #000000 !important;
         font-weight: 700;
-        font-size: 1.875rem;
-        margin-top: 2.5rem;
-        margin-bottom: 1.25rem;
-        letter-spacing: -0.01em;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
     }
     
-    h3 {
-        color: var(--text-primary);
+    .main h2 {
+        color: #111827 !important;
         font-weight: 600;
         font-size: 1.5rem;
         margin-top: 2rem;
         margin-bottom: 1rem;
     }
     
-    p {
-        color: var(--text-secondary);
-        line-height: 1.7;
+    .main h3 {
+        color: #111827 !important;
+        font-weight: 600;
+        font-size: 1.25rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .main p {
+        color: #1f2937 !important;
+        line-height: 1.6;
+    }
+    
+    /* Ensure text is readable in main content */
+    .main .stMarkdown {
+        color: #1f2937 !important;
+    }
+    
+    .main .stMarkdown strong {
+        color: #000000 !important;
+    }
+    
+    .main .stMarkdown code {
+        background: #f3f4f6 !important;
+        color: #111827 !important;
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
     }
     
     /* ===== SIDEBAR ===== */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-        box-shadow: var(--shadow-xl);
+        background: #111827 !important;
     }
     
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        color: #e2e8f0;
+        color: #ffffff !important;
     }
     
-    [data-testid="stSidebar"] .stSelectbox label {
-        color: #cbd5e1 !important;
-        font-weight: 500;
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h1,
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h2,
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3,
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: #ffffff !important;
     }
     
+    [data-testid="stSidebar"] .stSelectbox label,
     [data-testid="stSidebar"] .stTextInput label {
-        color: #cbd5e1 !important;
+        color: #f3f4f6 !important;
+        font-weight: 600 !important;
+    }
+    
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        background: #1f2937 !important;
+        border: 1px solid #374151 !important;
+        color: #ffffff !important;
+    }
+    
+    [data-testid="stSidebar"] .stSelectbox > div > div > select {
+        color: #ffffff !important;
+        background: #1f2937 !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextInput > div > div > input {
+        background: #1f2937 !important;
+        border: 1px solid #374151 !important;
+        color: #ffffff !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextInput > div > div > input::placeholder {
+        color: #9ca3af !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextInput > div > div > input:focus {
+        border-color: #60a5fa !important;
+        background: #1f2937 !important;
+        color: #ffffff !important;
+    }
+    
+    [data-testid="stSidebar"] .stButton > button {
+        background: #2563eb !important;
+        color: #ffffff !important;
+        border: none !important;
+    }
+    
+    [data-testid="stSidebar"] .stButton > button:hover {
+        background: #1d4ed8 !important;
+        color: #ffffff !important;
+    }
+    
+    [data-testid="stSidebar"] .stSuccess {
+        background: #065f46 !important;
+        color: #d1fae5 !important;
+        border: 1px solid #10b981 !important;
+    }
+    
+    [data-testid="stSidebar"] .stError {
+        background: #991b1b !important;
+        color: #fee2e2 !important;
+        border: 1px solid #ef4444 !important;
+    }
+    
+    [data-testid="stSidebar"] .stInfo {
+        background: #1e3a8a !important;
+        color: #dbeafe !important;
+        border: 1px solid #3b82f6 !important;
+    }
+    
+    [data-testid="stSidebar"] .stWarning {
+        background: #92400e !important;
+        color: #fef3c7 !important;
+        border: 1px solid #f59e0b !important;
     }
     
     /* ===== METRIC CARDS ===== */
     .metric-card {
         background: var(--bg-primary);
-        padding: 2rem;
-        border-radius: var(--radius-xl);
-        box-shadow: var(--shadow-md);
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         border: 1px solid var(--border);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
         height: 100%;
     }
     
-    .metric-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
-    }
-    
-    .metric-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-lg);
-    }
-    
-    .metric-card.success::before {
-        background: linear-gradient(90deg, var(--success) 0%, #34d399 100%);
-    }
-    
-    .metric-card.warning::before {
-        background: linear-gradient(90deg, var(--warning) 0%, #fbbf24 100%);
-    }
-    
-    .metric-card.info::before {
-        background: linear-gradient(90deg, var(--info) 0%, #60a5fa 100%);
-    }
-    
     .metric-label {
-        font-size: 0.875rem;
-        color: var(--text-tertiary);
+        font-size: 0.75rem;
+        color: #6b7280;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
         font-weight: 600;
         margin-bottom: 0.75rem;
         display: flex;
@@ -177,256 +203,163 @@ def inject_custom_css():
     }
     
     .metric-value {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: var(--text-primary);
+        font-size: 2rem;
+        font-weight: 700;
+        color: #000000;
         line-height: 1;
-        margin-bottom: 0.5rem;
-        font-variant-numeric: tabular-nums;
+    }
+    
+    .metric-card.success .metric-value {
+        color: #059669;
+    }
+    
+    .metric-card.warning .metric-value {
+        color: #d97706;
+    }
+    
+    .metric-card.info .metric-value {
+        color: #1d4ed8;
     }
     
     .metric-icon {
-        font-size: 1.5rem;
-        opacity: 0.8;
+        font-size: 1rem;
     }
     
     /* ===== BUTTONS ===== */
     .stButton > button {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        background: var(--primary);
         color: white;
-        border-radius: var(--radius-md);
-        padding: 0.75rem 1.75rem;
+        border-radius: 0.375rem;
+        padding: 0.5rem 1rem;
         font-weight: 600;
-        font-size: 0.9375rem;
         border: none;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: var(--shadow-md);
-        cursor: pointer;
     }
     
     .stButton > button:hover {
-        background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
+        background: #1d4ed8;
     }
     
-    .stButton > button:active {
-        transform: translateY(0);
+    /* ===== ALERT BOXES (Main Content) ===== */
+    .main .stInfo {
+        background: #dbeafe !important;
+        border-left: 4px solid #2563eb !important;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        color: #1e3a8a !important;
     }
     
-    /* ===== ALERT BOXES ===== */
-    .stInfo {
-        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-        border-left: 4px solid var(--info);
-        border-radius: var(--radius-lg);
-        padding: 1.25rem 1.5rem;
-        box-shadow: var(--shadow-sm);
+    .main .stInfo [data-testid="stMarkdownContainer"] {
+        color: #1e3a8a !important;
     }
     
-    .stSuccess {
-        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-        border-left: 4px solid var(--success);
-        border-radius: var(--radius-lg);
-        padding: 1.25rem 1.5rem;
-        box-shadow: var(--shadow-sm);
+    .main .stSuccess {
+        background: #d1fae5 !important;
+        border-left: 4px solid #10b981 !important;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        color: #065f46 !important;
     }
     
-    .stWarning {
-        background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-        border-left: 4px solid var(--warning);
-        border-radius: var(--radius-lg);
-        padding: 1.25rem 1.5rem;
-        box-shadow: var(--shadow-sm);
+    .main .stSuccess [data-testid="stMarkdownContainer"] {
+        color: #065f46 !important;
     }
     
-    .stError {
-        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-        border-left: 4px solid var(--error);
-        border-radius: var(--radius-lg);
-        padding: 1.25rem 1.5rem;
-        box-shadow: var(--shadow-sm);
+    .main .stWarning {
+        background: #fef3c7 !important;
+        border-left: 4px solid #f59e0b !important;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        color: #92400e !important;
+    }
+    
+    .main .stWarning [data-testid="stMarkdownContainer"] {
+        color: #92400e !important;
+    }
+    
+    .main .stError {
+        background: #fee2e2 !important;
+        border-left: 4px solid #ef4444 !important;
+        border-radius: 0.375rem;
+        padding: 1rem;
+        color: #991b1b !important;
+    }
+    
+    .main .stError [data-testid="stMarkdownContainer"] {
+        color: #991b1b !important;
     }
     
     /* ===== DATA TABLES ===== */
     .dataframe {
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-        box-shadow: var(--shadow-md);
-        border: 1px solid var(--border);
-        background: var(--bg-primary);
+        border-radius: 0.5rem;
+        border: 1px solid #d1d5db;
     }
     
     .dataframe thead {
-        background: linear-gradient(135deg, var(--text-primary) 0%, #1e293b 100%);
-        color: white;
+        background: #f3f4f6 !important;
     }
     
     .dataframe thead th {
-        padding: 1rem;
+        padding: 0.75rem 1rem;
         font-weight: 600;
-        text-transform: uppercase;
         font-size: 0.75rem;
-        letter-spacing: 0.05em;
-    }
-    
-    .dataframe tbody tr {
-        transition: background-color 0.2s;
+        color: #000000 !important;
+        background: #f3f4f6 !important;
     }
     
     .dataframe tbody tr:hover {
-        background-color: var(--bg-tertiary);
+        background: #f9fafb !important;
     }
     
     .dataframe tbody td {
-        padding: 0.875rem 1rem;
-        border-bottom: 1px solid var(--border);
+        padding: 0.75rem 1rem;
+        color: #1f2937 !important;
+        background: #ffffff !important;
     }
     
     /* ===== INPUT FIELDS ===== */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea,
-    .stSelectbox > div > div > select {
-        border-radius: var(--radius-md);
-        border: 2px solid var(--border);
-        padding: 0.75rem 1rem;
-        transition: all 0.2s;
-        background: var(--bg-primary);
-    }
-    
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus,
     .stSelectbox > div > div > select:focus {
         border-color: var(--primary);
         outline: none;
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     }
     
-    /* ===== CARDS & CONTAINERS ===== */
+    /* ===== CARDS ===== */
     .content-card {
         background: var(--bg-primary);
-        padding: 2rem;
-        border-radius: var(--radius-xl);
-        box-shadow: var(--shadow-md);
-        border: 1px solid var(--border);
-        margin-bottom: 2rem;
-    }
-    
-    .section-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        border: 1px solid #d1d5db;
         margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid var(--border);
     }
     
-    /* ===== LOADING STATES ===== */
-    @keyframes pulse {
-        0%, 100% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.5;
-        }
+    /* ===== INPUT FIELDS (Main Content) ===== */
+    .main .stTextInput > div > div > input,
+    .main .stTextArea > div > div > textarea,
+    .main .stSelectbox > div > div > select {
+        color: #000000 !important;
+        background: #ffffff !important;
+        border: 1px solid #d1d5db !important;
     }
     
-    .loading-skeleton {
-        background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
-        background-size: 200% 100%;
-        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        border-radius: var(--radius-md);
-        height: 1rem;
-        margin-bottom: 0.5rem;
+    .main .stTextInput > div > div > input:focus,
+    .main .stTextArea > div > div > textarea:focus,
+    .main .stSelectbox > div > div > select:focus {
+        border-color: #2563eb !important;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
     }
     
-    /* ===== SCROLLBAR ===== */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: var(--bg-secondary);
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: var(--border);
-        border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: var(--text-tertiary);
+    .main .stTextInput label,
+    .main .stTextArea label,
+    .main .stSelectbox label {
+        color: #111827 !important;
+        font-weight: 600 !important;
     }
     
     /* ===== HIDE STREAMLIT BRANDING ===== */
-    #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
     .stDeployButton {display: none;}
-    
-    /* ===== ANIMATIONS ===== */
-    @keyframes fadeIn {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    .fade-in {
-        animation: fadeIn 0.5s ease-out;
-    }
-    
-    /* ===== RESPONSIVE ===== */
-    @media (max-width: 768px) {
-        .main {
-            padding: 1rem;
-        }
-        
-        h1 {
-            font-size: 2rem;
-        }
-        
-        .metric-value {
-            font-size: 2rem;
-        }
-    }
-    
-    /* ===== UTILITY CLASSES ===== */
-    .text-gradient {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    
-    .badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    
-    .badge-success {
-        background: #d1fae5;
-        color: #065f46;
-    }
-    
-    .badge-warning {
-        background: #fef3c7;
-        color: #92400e;
-    }
-    
-    .badge-error {
-        background: #fee2e2;
-        color: #991b1b;
-    }
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -558,14 +491,13 @@ def verify_google_token(token: str) -> Optional[str]:
     except ValueError:
         return None
 
-# Sidebar navigation with professional styling
+# Sidebar navigation
 st.sidebar.markdown("""
-<div style='text-align: center; padding: 2rem 1rem 1.5rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem;'>
-    <div style='font-size: 2.5rem; margin-bottom: 0.5rem;'>📊</div>
-    <h1 style='color: white; font-size: 1.5rem; font-weight: 700; margin: 0; letter-spacing: -0.02em;'>
+<div style='text-align: center; padding: 2rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem;'>
+    <h1 style='color: white; font-size: 1.25rem; font-weight: 600; margin: 0;'>
         Sales Intelligence
     </h1>
-    <p style='color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0 0 0; font-weight: 400;'>
+    <p style='color: #9ca3af; font-size: 0.875rem; margin: 0.5rem 0 0 0;'>
         AI-Powered Sales Automation
     </p>
 </div>
@@ -578,12 +510,10 @@ if not st.session_state.authenticated:
     # Google OAuth (if configured)
     if GOOGLE_AUTH_AVAILABLE and GOOGLE_CLIENT_ID:
         st.sidebar.info("Google OAuth authentication available")
-        # In production, implement full OAuth flow with redirect
-        # For now, fall back to simple email auth
     
-    # Simple email authentication (fallback)
-    user_email = st.sidebar.text_input("Email", value="anand@maharaniweddings.com")
-    if st.sidebar.button("Login"):
+    # Simple email authentication
+    user_email = st.sidebar.text_input("Email", value="")
+    if st.sidebar.button("Login", use_container_width=True):
         if user_email and "@" in user_email:
             st.session_state.authenticated = True
             st.session_state.user_email = user_email
@@ -591,51 +521,20 @@ if not st.session_state.authenticated:
         else:
             st.sidebar.error("Please enter a valid email address")
 else:
-    st.sidebar.markdown(f"""
-    <div style='background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;'>
-        <div style='color: #cbd5e1; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;'>
-            Logged in as
-        </div>
-        <div style='color: white; font-weight: 600; font-size: 0.9375rem; word-break: break-all;'>
-            {st.session_state.user_email}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.sidebar.button("🚪 Logout", use_container_width=True):
+    st.sidebar.success(f"Logged in as: {st.session_state.user_email}")
+    if st.sidebar.button("Logout", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.user_email = None
         st.rerun()
 
 if not st.session_state.authenticated:
     st.markdown("""
-    <div style='text-align: center; padding: 6rem 2rem; max-width: 600px; margin: 0 auto;'>
-        <div style='font-size: 5rem; margin-bottom: 1.5rem;'>📊</div>
-        <h1 class='text-gradient' style='margin-bottom: 1rem; font-size: 3rem;'>
-            Sales Intelligence
-        </h1>
-        <p style='font-size: 1.25rem; color: var(--text-secondary); margin-bottom: 3rem; line-height: 1.6;'>
+    <div style='text-align: center; padding: 4rem 2rem;'>
+        <h1>Sales Intelligence</h1>
+        <p style='color: var(--text-secondary); margin-bottom: 2rem;'>
             AI-Powered Sales Intelligence & Automation Platform
         </p>
-        <div style='background: var(--bg-primary); padding: 2rem; border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); border: 1px solid var(--border);'>
-            <h3 style='color: var(--text-primary); margin-bottom: 1rem;'>Welcome Back</h3>
-            <p style='color: var(--text-secondary); margin-bottom: 2rem;'>
-                Please log in using the sidebar to access your dashboard
-            </p>
-            <div style='display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem;'>
-                <div style='flex: 1; min-width: 150px; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);'>
-                    <div style='font-size: 2rem; margin-bottom: 0.5rem;'>📈</div>
-                    <strong style='color: var(--text-primary); font-size: 0.875rem;'>Real-time Analytics</strong>
-                </div>
-                <div style='flex: 1; min-width: 150px; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);'>
-                    <div style='font-size: 2rem; margin-bottom: 0.5rem;'>🤖</div>
-                    <strong style='color: var(--text-primary); font-size: 0.875rem;'>AI-Powered Insights</strong>
-                </div>
-                <div style='flex: 1; min-width: 150px; padding: 1rem; background: var(--bg-secondary); border-radius: var(--radius-md);'>
-                    <div style='font-size: 2rem; margin-bottom: 0.5rem;'>⚡</div>
-                    <strong style='color: var(--text-primary); font-size: 0.875rem;'>Smart Automation</strong>
-                </div>
-            </div>
-        </div>
+        <p>Please log in using the sidebar to access the dashboard.</p>
     </div>
     """, unsafe_allow_html=True)
     st.stop()
@@ -656,14 +555,8 @@ page = st.sidebar.selectbox(
 
 # Dashboard Page
 if page == "Dashboard":
-    st.markdown("""
-    <div class='fade-in' style='margin-bottom: 3rem;'>
-        <h1>📊 Sales Intelligence Dashboard</h1>
-        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
-            Real-time insights and metrics for your sales pipeline
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Sales Intelligence Dashboard")
+    st.markdown("Real-time insights and metrics for your sales pipeline")
     
     # Get metrics from BigQuery
     if st.session_state.bq_client:
@@ -714,101 +607,37 @@ if page == "Dashboard":
         if 'bq_error' in st.session_state and st.session_state.bq_error:
             error_msg = f"\n\n**Error Details:** `{st.session_state.bq_error}`"
         
-        st.markdown(f"""
-        <div class='content-card fade-in' style='background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid var(--warning);'>
-            <div style='display: flex; align-items: start; gap: 1rem;'>
-                <div style='font-size: 2rem;'>⚠️</div>
-                <div style='flex: 1;'>
-                    <h3 style='margin-top: 0; color: var(--text-primary); margin-bottom: 0.75rem;'>
-                        BigQuery Client Not Available
-                    </h3>
-                    <p style='color: var(--text-secondary); margin-bottom: 1rem;'>
-                        The app is running in demo mode. To enable full functionality:
-                    </p>
-                    <ol style='color: var(--text-secondary); margin-left: 1.5rem; line-height: 2;'>
-                        <li>Set up GCP credentials: <code style='background: white; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.875rem;'>gcloud auth application-default login</code></li>
-                        <li>Ensure the service account has BigQuery access</li>
-                        <li>Restart the application</li>
-                    </ol>
-                    {f'<div style="margin-top: 1rem; padding: 1rem; background: white; border-radius: var(--radius-md); border-left: 3px solid var(--error);"><strong style="color: var(--error);">Error Details:</strong><pre style="margin: 0.5rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary); overflow-x: auto;">{error_msg[:500]}</pre></div>' if error_msg else ''}
-                    <p style='color: var(--text-secondary); margin-top: 1rem; margin-bottom: 0; font-size: 0.875rem;'>
-                        You can still explore the interface, but data will show as 0 until BigQuery is connected.
-                    </p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.warning("""
+        **BigQuery Client Not Available**
+        
+        The app is running in demo mode. To enable full functionality:
+        1. Set up GCP credentials: `gcloud auth application-default login`
+        2. Ensure the service account has BigQuery access
+        3. Restart the application
+        
+        You can still explore the interface, but data will show as 0 until BigQuery is connected.
+        """)
+        if error_msg:
+            with st.expander("Error Details"):
+                st.code(error_msg[:500])
         total_accounts_count = high_priority_count = unmatched_count = opportunities_count = 0
     
-    # Professional metric cards with icons
+    # Metric cards
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown(f"""
-        <div class='metric-card fade-in'>
-            <div class='metric-label'>
-                <span class='metric-icon'>🏢</span>
-                <span>Total Accounts</span>
-            </div>
-            <div class='metric-value'>{total_accounts_count:,}</div>
-            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
-                Active accounts in system
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Total Accounts", f"{total_accounts_count:,}")
     with col2:
-        st.markdown(f"""
-        <div class='metric-card success fade-in'>
-            <div class='metric-label'>
-                <span class='metric-icon'>🎯</span>
-                <span>High Priority</span>
-            </div>
-            <div class='metric-value' style='color: var(--success);'>{high_priority_count:,}</div>
-            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
-                Score ≥ 70 • Today
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("High Priority", f"{high_priority_count:,}")
     with col3:
-        st.markdown(f"""
-        <div class='metric-card warning fade-in'>
-            <div class='metric-label'>
-                <span class='metric-icon'>📧</span>
-                <span>Unmatched Emails</span>
-            </div>
-            <div class='metric-value' style='color: var(--warning);'>{unmatched_count:,}</div>
-            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
-                Last 90 days
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Unmatched Emails", f"{unmatched_count:,}")
     with col4:
-        st.markdown(f"""
-        <div class='metric-card info fade-in'>
-            <div class='metric-label'>
-                <span class='metric-icon'>💼</span>
-                <span>Open Opportunities</span>
-            </div>
-            <div class='metric-value' style='color: var(--info);'>{opportunities_count:,}</div>
-            <div style='font-size: 0.875rem; color: var(--text-tertiary); margin-top: 0.5rem;'>
-                Active in pipeline
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Open Opportunities", f"{opportunities_count:,}")
     
-    st.markdown("<div style='margin: 3rem 0;'></div>", unsafe_allow_html=True)
+    st.markdown("---")
     
-    # Top priority accounts section
-    st.markdown("""
-    <div class='section-header'>
-        <div>
-            <h2 style='margin: 0;'>🎯 Top Priority Accounts</h2>
-            <p style='color: var(--text-secondary); margin: 0.5rem 0 0 0; font-size: 0.9375rem;'>
-                Accounts requiring immediate attention today
-            </p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Top priority accounts
+    st.subheader("Top Priority Accounts")
     
     if st.button("Refresh Account Scores"):
         with st.spinner("Refreshing account scores..."):
@@ -860,48 +689,9 @@ gcloud functions deploy account-scoring \\
             top_accounts = query_bigquery(top_accounts_query)
             if top_accounts:
                 df = pd.DataFrame(top_accounts)
-                st.markdown("""
-                <div class='content-card fade-in'>
-                """, unsafe_allow_html=True)
-                st.dataframe(
-                    df,
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "priority_score": st.column_config.NumberColumn(
-                            "Priority Score",
-                            help="Account priority score (0-100)",
-                            format="%.1f",
-                            min_value=0,
-                            max_value=100,
-                        ),
-                        "budget_likelihood": st.column_config.NumberColumn(
-                            "Budget Likelihood",
-                            help="Likelihood of budget availability (0-100)",
-                            format="%.1f",
-                            min_value=0,
-                            max_value=100,
-                        ),
-                        "engagement_score": st.column_config.NumberColumn(
-                            "Engagement",
-                            help="Recent engagement score (0-100)",
-                            format="%.1f",
-                            min_value=0,
-                            max_value=100,
-                        ),
-                    }
-                )
-                st.markdown("</div>", unsafe_allow_html=True)
+                st.dataframe(df, use_container_width=True, hide_index=True)
             else:
-                st.markdown("""
-                <div class='content-card fade-in' style='text-align: center; padding: 3rem 2rem;'>
-                    <div style='font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;'>📊</div>
-                    <h3 style='color: var(--text-primary); margin-bottom: 0.5rem;'>No Account Scores Available</h3>
-                    <p style='color: var(--text-secondary); margin-bottom: 1.5rem;'>
-                        Account scores are generated daily. Click the button above to refresh scores.
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
+                st.info("No account scores available for today. Click 'Refresh Account Scores' to generate.")
         except Exception as e:
             st.error(f"Error loading accounts: {str(e)}")
     else:
@@ -919,52 +709,18 @@ gcloud functions deploy account-scoring \\
 
 # Account Scoring Page
 elif page == "Account Scoring":
-    st.markdown("""
-    <div class='fade-in' style='margin-bottom: 3rem;'>
-        <h1>🎯 Account Scoring</h1>
-        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
-            AI-powered account prioritization and scoring
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Account Scoring")
+    st.markdown("AI-powered account prioritization and scoring")
     
-    st.markdown("""
-    <div class='content-card fade-in' style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid var(--info); margin-bottom: 2rem;'>
-        <h3 style='margin-top: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;'>
-            <span>📈</span>
-            <span>Account Scoring Methodology</span>
-        </h3>
-        <p style='margin-bottom: 1rem; color: var(--text-secondary);'>
-            Account scores are generated daily using AI analysis of:
-        </p>
-        <div style='display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;'>
-            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
-                <strong style='color: var(--text-primary);'>📧 Email Engagement</strong>
-                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
-                    Response rates and interaction patterns
-                </p>
-            </div>
-            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
-                <strong style='color: var(--text-primary);'>📞 Call Activity</strong>
-                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
-                    Call frequency and sentiment analysis
-                </p>
-            </div>
-            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
-                <strong style='color: var(--text-primary);'>💼 Opportunities</strong>
-                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
-                    Pipeline health and deal progression
-                </p>
-            </div>
-            <div style='padding: 0.75rem; background: white; border-radius: var(--radius-md);'>
-                <strong style='color: var(--text-primary);'>⚡ Activity Level</strong>
-                <p style='margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);'>
-                    Overall account activity and touchpoints
-                </p>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.info("""
+    **Account Scoring Methodology**
+    
+    Account scores are generated daily using AI analysis of:
+    - **Email Engagement** - Response rates and interaction patterns
+    - **Call Activity** - Call frequency and sentiment analysis
+    - **Opportunities** - Pipeline health and deal progression
+    - **Activity Level** - Overall account activity and touchpoints
+    """)
     
     if st.session_state.bq_client:
         # Score distribution
@@ -1046,34 +802,19 @@ elif page == "Account Scoring":
 
 # Natural Language Query Page
 elif page == "Natural Language Query":
-    st.markdown("""
-    <div class='fade-in' style='margin-bottom: 3rem;'>
-        <h1>💬 Natural Language Query</h1>
-        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
-            Ask questions about your sales data in plain English
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Natural Language Query")
+    st.markdown("Ask questions about your sales data in plain English")
     
-    st.markdown("""
-    <div class='content-card fade-in' style='background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); margin-bottom: 2rem;'>
-        <h3 style='margin-top: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;'>
-            <span>💡</span>
-            <span>How It Works</span>
-        </h3>
-        <p style='color: var(--text-secondary); margin-bottom: 1rem;'>
-            Ask questions about your sales data in plain English. The AI will convert your question into SQL and execute it.
-        </p>
-        <div style='background: white; padding: 1.25rem; border-radius: var(--radius-md); border-left: 3px solid var(--primary);'>
-            <strong style='color: var(--text-primary); display: block; margin-bottom: 0.75rem;'>Example Queries:</strong>
-            <ul style='margin: 0; padding-left: 1.5rem; color: var(--text-secondary); line-height: 2;'>
-                <li>"Show me accounts with high engagement in the last week"</li>
-                <li>"Which accounts are discussing budget for 2026?"</li>
-                <li>"Find contacts who haven't been called in 30 days"</li>
-            </ul>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.info("""
+    **How It Works**
+    
+    Ask questions about your sales data in plain English. The AI will convert your question into SQL and execute it.
+    
+    **Example Queries:**
+    - "Show me accounts with high engagement in the last week"
+    - "Which accounts are discussing budget for 2026?"
+    - "Find contacts who haven't been called in 30 days"
+    """)
     
     query = st.text_area("Enter your question:", height=100)
     
@@ -1105,36 +846,21 @@ elif page == "Natural Language Query":
         else:
             st.warning("Please enter a query.")
 
-# Semantic Search Page (NEW)
+# Semantic Search Page
 elif page == "Semantic Search":
-    st.markdown("""
-    <div class='fade-in' style='margin-bottom: 3rem;'>
-        <h1>🔍 Semantic Search</h1>
-        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
-            AI-powered intent-based search across all communications
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Semantic Search")
+    st.markdown("AI-powered intent-based search across all communications")
     
-    st.markdown("""
-    <div class='content-card fade-in' style='background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid var(--info); margin-bottom: 2rem;'>
-        <h3 style='margin-top: 0; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;'>
-            <span>🔍</span>
-            <span>AI-Powered Semantic Search</span>
-        </h3>
-        <p style='color: var(--text-secondary); margin-bottom: 1rem;'>
-            Find accounts, emails, or calls by intent using advanced vector search technology. Search by meaning, not just keywords.
-        </p>
-        <div style='background: white; padding: 1.25rem; border-radius: var(--radius-md); border-left: 3px solid var(--info);'>
-            <strong style='color: var(--text-primary); display: block; margin-bottom: 0.75rem;'>Example Searches:</strong>
-            <ul style='margin: 0; padding-left: 1.5rem; color: var(--text-secondary); line-height: 2;'>
-                <li><strong>"budget discussions for 2026"</strong> - Find budget-related conversations</li>
-                <li><strong>"renewal concerns"</strong> - Discover accounts worried about renewals</li>
-                <li><strong>"pricing negotiations"</strong> - Locate pricing discussion threads</li>
-            </ul>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.info("""
+    **AI-Powered Semantic Search**
+    
+    Find accounts, emails, or calls by intent using advanced vector search technology. Search by meaning, not just keywords.
+    
+    **Example Searches:**
+    - "budget discussions for 2026" - Find budget-related conversations
+    - "renewal concerns" - Discover accounts worried about renewals
+    - "pricing negotiations" - Locate pricing discussion threads
+    """)
     
     search_query = st.text_input("Enter search query:")
     search_type = st.selectbox("Search Type", ["accounts", "emails", "calls"])
@@ -1166,14 +892,8 @@ elif page == "Semantic Search":
 
 # Unmatched Emails Page
 elif page == "Unmatched Emails":
-    st.markdown("""
-    <div class='fade-in' style='margin-bottom: 3rem;'>
-        <h1>📧 Unmatched Emails</h1>
-        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
-            Create leads from emails with unknown contacts
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Unmatched Emails")
+    st.markdown("Create leads from emails with unknown contacts")
     
     st.markdown("""
     Emails from contacts not yet in Salesforce. Create leads from these emails.
@@ -1249,14 +969,8 @@ elif page == "Unmatched Emails":
 
 # Account Details Page
 elif page == "Account Details":
-    st.markdown("""
-    <div class='fade-in' style='margin-bottom: 3rem;'>
-        <h1>🏢 Account Details</h1>
-        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
-            Complete account information and interaction history
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Account Details")
+    st.markdown("Complete account information and interaction history")
     
     account_search = st.text_input("Search Account by ID or Name:")
     
@@ -1381,14 +1095,8 @@ elif page == "Account Details":
 
 # Email Threads Page
 elif page == "Email Threads":
-    st.markdown("""
-    <div class='fade-in' style='margin-bottom: 3rem;'>
-        <h1>📬 Email Threads</h1>
-        <p style='color: var(--text-secondary); font-size: 1.125rem; margin-top: 0.5rem; font-weight: 400;'>
-            View conversations and generate AI-powered replies
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Email Threads")
+    st.markdown("View conversations and generate AI-powered replies")
     
     thread_search = st.text_input("Enter Thread ID or Email Address:")
     
@@ -1453,15 +1161,11 @@ elif page == "Email Threads":
         else:
             st.warning("BigQuery client not available")
 
-# Professional Footer
+# Footer
+st.sidebar.markdown("---")
 st.sidebar.markdown("""
-<div style='position: fixed; bottom: 0; left: 0; right: 0; padding: 1.5rem 1rem; background: rgba(15, 23, 42, 0.5); border-top: 1px solid rgba(255,255,255,0.1);'>
-    <div style='text-align: center; color: #94a3b8;'>
-        <p style='font-weight: 600; margin-bottom: 0.25rem; color: #cbd5e1; font-size: 0.875rem;'>
-            Sales Intelligence System
-        </p>
-        <p style='font-size: 0.75rem; margin: 0;'>Version 2.0 • Phase 2 & 3</p>
-    </div>
+<div style='text-align: center; color: #9ca3af; font-size: 0.75rem;'>
+    Sales Intelligence v2.0
 </div>
 """, unsafe_allow_html=True)
 
