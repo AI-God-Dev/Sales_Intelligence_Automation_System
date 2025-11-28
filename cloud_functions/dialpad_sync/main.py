@@ -167,25 +167,33 @@ def _sync_all_calls_workaround(
     # IMPORTANT: Insert in batches during pagination to avoid timeouts
     page_size = 10  # This limit works (100+ returns 400)
     batch_size = 50  # Insert every 50 calls to avoid timeouts
+    max_calls_to_sync = 2000  # Limit calls per sync run to prevent timeouts
     cursor = None
     max_iterations = 500  # Safety limit (10 calls per page = up to 5,000 calls)
     
     # Buffer for batching inserts
     pending_rows = []
+    consecutive_old_calls = 0  # Track consecutive old calls for early stopping in incremental sync
+    max_consecutive_old = 50  # Stop if we see 50 consecutive old calls (incremental sync)
     
     try:
-        logger.info(f"Fetching calls with batch insertion (batch_size={batch_size})...")
+        logger.info(f"Fetching calls with batch insertion (batch_size={batch_size}, max_calls={max_calls_to_sync})...")
         logger.info(f"Using /call endpoint with limit={page_size}")
         
         iteration = 0
-        while iteration < max_iterations:
+        while iteration < max_iterations and calls_synced < max_calls_to_sync:
             iteration += 1
             params = {"limit": page_size}
             if cursor:
                 params["cursor"] = cursor
             
             if iteration % 50 == 0:  # Log every 50 iterations
-                logger.info(f"Iteration {iteration}: Fetched {calls_synced} calls so far, {len(pending_rows)} pending...")
+                logger.info(f"Iteration {iteration}: Synced {calls_synced}/{max_calls_to_sync} calls, {len(pending_rows)} pending...")
+            
+            # Early stop if we've synced enough calls
+            if calls_synced >= max_calls_to_sync:
+                logger.info(f"Reached max_calls limit ({max_calls_to_sync}). Stopping pagination.")
+                break
             
             response = requests.get(
                 f"{base_url}/call",
@@ -210,6 +218,10 @@ def _sync_all_calls_workaround(
                     if page_calls:
                         # Process each call immediately: filter, transform, and batch for insertion
                         for call in page_calls:
+                            # Early stop check
+                            if calls_synced >= max_calls_to_sync:
+                                break
+                            
                             # Step 1: Filter by date (if incremental sync)
                             if last_sync_timestamp_ms:
                                 date_started = call.get("date_started")
@@ -221,7 +233,15 @@ def _sync_all_calls_workaround(
                                         except ValueError:
                                             continue
                                     if date_started < last_sync_timestamp_ms:
+                                        consecutive_old_calls += 1
+                                        # For incremental sync, if we see many consecutive old calls, we've likely caught up
+                                        if consecutive_old_calls >= max_consecutive_old:
+                                            logger.info(f"Found {consecutive_old_calls} consecutive old calls. Stopping incremental sync (caught up).")
+                                            break
                                         continue  # Skip this call, it's too old
+                            
+                            # Reset counter when we find a new call
+                            consecutive_old_calls = 0
                             
                             # Step 2: Filter by user (if specific user requested)
                             if user_id:
@@ -267,6 +287,15 @@ def _sync_all_calls_workaround(
                                 logger.error(f"Error transforming call {call.get('id')}: {e}")
                                 errors += 1
                         
+                        # Early stop checks - break out of pagination loop
+                        if calls_synced >= max_calls_to_sync:
+                            logger.info(f"Reached max_calls limit ({max_calls_to_sync}) during processing. Stopping pagination.")
+                            break
+                        
+                        if last_sync_timestamp_ms and consecutive_old_calls >= max_consecutive_old:
+                            logger.info(f"Incremental sync caught up (found {consecutive_old_calls} old calls). Stopping pagination.")
+                            break
+                        
                         # If no cursor or empty cursor, we're done
                         if not cursor:
                             logger.info(f"No cursor returned, pagination complete at iteration {iteration}")
@@ -294,10 +323,12 @@ def _sync_all_calls_workaround(
                 logger.error(f"Error inserting final batch: {e}", exc_info=True)
                 errors += len(pending_rows)
         
-        logger.info(f"✅ Completed: Fetched and processed {calls_synced} calls across {iteration} iterations")
+        logger.info(f"✅ Sync completed: Inserted {calls_synced} calls across {iteration} iterations")
         
         if calls_synced == 0 and iteration > 0:
             logger.warning(f"⚠️ Processed {iteration} iterations but no calls were inserted (may have been filtered out)")
+        elif calls_synced >= max_calls_to_sync:
+            logger.info(f"ℹ️ Reached max_calls limit ({max_calls_to_sync}). More calls may be available. Next sync will continue.")
             
     except Exception as e:
         logger.error(f"Error fetching all calls: {e}", exc_info=True)
