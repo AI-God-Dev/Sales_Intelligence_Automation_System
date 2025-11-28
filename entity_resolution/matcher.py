@@ -1,6 +1,6 @@
 """Entity resolution logic for matching emails and calls to Salesforce contacts/accounts."""
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Iterable
 from google.cloud import bigquery
 from utils.email_normalizer import normalize_email
 from utils.phone_normalizer import normalize_phone, match_phone_numbers, extract_last_10_digits
@@ -301,11 +301,32 @@ class EntityMatcher:
         try:
             participants = self.bq_client.query(query)
             
+            if not participants:
+                logger.info("No unmatched gmail participants found")
+                return stats
+            
+            normalized_emails = []
+            for participant in participants:
+                normalized = normalize_email(participant["email_address"])
+                if normalized:
+                    normalized_emails.append(normalized)
+            
+            unique_emails = sorted(set(normalized_emails))
+            
+            manual_map = self._fetch_manual_email_mappings(unique_emails)
+            contact_map = self._fetch_contacts_by_emails(unique_emails)
+            
             updates = []
             for participant in participants:
                 try:
                     stats["processed"] += 1
-                    match = self.match_email_to_contact(participant["email_address"], check_manual_mappings=False)
+                    normalized_email = normalize_email(participant["email_address"])
+                    
+                    if not normalized_email:
+                        stats["errors"] += 1
+                        continue
+                    
+                    match = manual_map.get(normalized_email) or contact_map.get(normalized_email)
                     
                     if match:
                         updates.append({
@@ -321,7 +342,6 @@ class EntityMatcher:
                     logger.error(f"Error matching participant {participant.get('participant_id')}: {e}")
                     stats["errors"] += 1
             
-            # Batch update using MERGE statement
             if updates:
                 self._batch_update_participants(updates)
             
@@ -365,14 +385,32 @@ class EntityMatcher:
         try:
             calls = self.bq_client.query(query)
             
+            if not calls:
+                logger.info("No unmatched dialpad calls found")
+                return stats
+            
+            last10_digits_set = set()
+            for call in calls:
+                for num in (call.get("from_number"), call.get("to_number")):
+                    digits = extract_last_10_digits(num)
+                    if digits:
+                        last10_digits_set.add(digits)
+            last10_digits = sorted(last10_digits_set)
+            
+            manual_phone_map = self._fetch_manual_phone_mappings(last10_digits)
+            contact_phone_map = self._fetch_contacts_by_phone_digits(last10_digits)
+            
             updates = []
             for call in calls:
                 try:
                     stats["processed"] += 1
                     
-                    # Try to match from_number first, then to_number
                     phone = call.get("from_number") or call.get("to_number")
-                    match = self.match_phone_to_contact_enhanced(phone, check_manual_mappings=False) if phone else None
+                    digits = extract_last_10_digits(phone) if phone else None
+                    
+                    match = manual_phone_map.get(digits) if digits else None
+                    if not match and digits:
+                        match = contact_phone_map.get(digits)
                     
                     if match:
                         updates.append({
@@ -398,6 +436,154 @@ class EntityMatcher:
             stats["errors"] += 1
         
         return stats
+    
+    def _fetch_contacts_by_emails(self, emails: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+        """Fetch contact/account matches for a set of normalized emails."""
+        email_list = [email for email in emails if email]
+        if not email_list:
+            return {}
+        
+        query = f"""
+        SELECT 
+            LOWER(email) AS normalized_email,
+            contact_id,
+            account_id
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_contacts`
+        WHERE email IS NOT NULL
+          AND LOWER(email) IN UNNEST(@emails)
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("emails", "STRING", email_list)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        return {
+            row["normalized_email"]: {
+                "contact_id": row["contact_id"],
+                "account_id": row["account_id"],
+                "match_confidence": "exact"
+            }
+            for row in results
+        }
+    
+    def _fetch_manual_email_mappings(self, emails: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+        """Fetch manual mappings for a set of normalized emails."""
+        email_list = [email for email in emails if email]
+        if not email_list:
+            return {}
+        
+        query = f"""
+        SELECT 
+            LOWER(email_address) AS normalized_email,
+            sf_contact_id,
+            sf_account_id
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.manual_mappings`
+        WHERE is_active = TRUE
+          AND email_address IS NOT NULL
+          AND LOWER(email_address) IN UNNEST(@emails)
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("emails", "STRING", email_list)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        return {
+            row["normalized_email"]: {
+                "contact_id": row["sf_contact_id"],
+                "account_id": row["sf_account_id"],
+                "match_confidence": "manual"
+            }
+            for row in results
+            if row.get("sf_contact_id") and row.get("sf_account_id")
+        }
+    
+    def _fetch_manual_phone_mappings(self, digits: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+        """Fetch manual phone mappings keyed by the last 10 digits."""
+        digit_list = [d for d in digits if d]
+        if not digit_list:
+            return {}
+        
+        query = f"""
+        SELECT 
+            RIGHT(REGEXP_REPLACE(phone_number, r'\\D', ''), 10) AS digits,
+            sf_contact_id,
+            sf_account_id
+        FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.manual_mappings`
+        WHERE is_active = TRUE
+          AND phone_number IS NOT NULL
+          AND RIGHT(REGEXP_REPLACE(phone_number, r'\\D', ''), 10) IN UNNEST(@digits)
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("digits", "STRING", digit_list)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        return {
+            row["digits"]: {
+                "contact_id": row["sf_contact_id"],
+                "account_id": row["sf_account_id"]
+            }
+            for row in results
+            if row.get("digits") and row.get("sf_contact_id")
+        }
+    
+    def _fetch_contacts_by_phone_digits(self, digits: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+        """Fetch contact matches keyed by the last 10 digits of phone numbers."""
+        digit_list = [d for d in digits if d]
+        if not digit_list:
+            return {}
+        
+        query = f"""
+        WITH contact_digits AS (
+            SELECT 
+                contact_id,
+                account_id,
+                RIGHT(REGEXP_REPLACE(phone, r'\\D', ''), 10) AS digits
+            FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_contacts`
+            WHERE phone IS NOT NULL
+            
+            UNION ALL
+            
+            SELECT 
+                contact_id,
+                account_id,
+                RIGHT(REGEXP_REPLACE(mobile_phone, r'\\D', ''), 10) AS digits
+            FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_contacts`
+            WHERE mobile_phone IS NOT NULL
+        )
+        SELECT 
+            contact_id,
+            account_id,
+            digits
+        FROM contact_digits
+        WHERE digits IS NOT NULL
+          AND digits IN UNNEST(@digits)
+        """
+        
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("digits", "STRING", digit_list)
+            ]
+        )
+        
+        results = self.bq_client.query(query, job_config)
+        return {
+            row["digits"]: {
+                "contact_id": row["contact_id"],
+                "account_id": row["account_id"]
+            }
+            for row in results
+            if row.get("digits") and row.get("contact_id")
+        }
     
     def _batch_update_participants(self, updates: List[Dict[str, Any]]):
         """Batch update participants using MERGE statement."""
