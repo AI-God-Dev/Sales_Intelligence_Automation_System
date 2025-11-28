@@ -22,8 +22,9 @@ gcloud functions deploy generate-embeddings `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.embeddings.main.generate_embeddings `
+  --entry-point=generate_embeddings `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=1024MB `
   --timeout=540s `
@@ -39,8 +40,9 @@ gcloud functions deploy account-scoring `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.scoring.main.account_scoring_job `
+  --entry-point=account_scoring_job `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=2048MB `
   --timeout=540s `
@@ -56,8 +58,9 @@ gcloud functions deploy nlp-query `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.nlp_query.main.nlp_query `
+  --entry-point=nlp_query `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=1024MB `
   --timeout=60s `
@@ -73,8 +76,9 @@ gcloud functions deploy create-leads `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.automation.main.create_leads `
+  --entry-point=create_leads `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=512MB `
   --timeout=300s `
@@ -90,8 +94,9 @@ gcloud functions deploy enroll-hubspot `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.automation.main.enroll_hubspot `
+  --entry-point=enroll_hubspot `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=512MB `
   --timeout=300s `
@@ -107,8 +112,9 @@ gcloud functions deploy get-hubspot-sequences `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.automation.main.get_hubspot_sequences `
+  --entry-point=get_hubspot_sequences `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=512MB `
   --timeout=60s `
@@ -124,8 +130,9 @@ gcloud functions deploy generate-email-reply `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.email_replies.main.generate_email_reply `
+  --entry-point=generate_email_reply `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=1024MB `
   --timeout=120s `
@@ -141,8 +148,9 @@ gcloud functions deploy semantic-search `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.vector_search.main.semantic_search `
+  --entry-point=semantic_search `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
   --memory=1024MB `
   --timeout=60s `

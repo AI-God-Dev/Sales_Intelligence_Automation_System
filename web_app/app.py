@@ -9,9 +9,11 @@ import os
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
+# Use resolve() to get absolute path, then go up two levels (web_app -> project root)
+project_root = Path(__file__).resolve().parent.parent
+project_root_str = str(project_root)
+if project_root_str not in sys.path:
+    sys.path.insert(0, project_root_str)
 
 import requests
 from requests.exceptions import HTTPError, ConnectionError, Timeout
@@ -377,10 +379,15 @@ except ImportError:
 
 # Try to import BigQuery client
 try:
+    # Ensure path is set before importing (use absolute path)
+    if project_root_str not in sys.path:
+        sys.path.insert(0, project_root_str)
     from utils.bigquery_client import BigQueryClient
     BQ_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     BQ_AVAILABLE = False
+    import logging
+    logging.warning(f"BigQueryClient import failed: {e}. Project root: {project_root_str}, sys.path: {sys.path[:3]}")
 
 # Page configuration
 st.set_page_config(
@@ -393,7 +400,6 @@ st.set_page_config(
 # Configuration
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
 REGION = os.getenv("GCP_REGION", "us-central1")
-FUNCTIONS_BASE_URL = f"https://{REGION}-{PROJECT_ID}.cloudfunctions.net"
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
 # Initialize session state
@@ -403,38 +409,169 @@ if 'user_email' not in st.session_state:
     st.session_state.user_email = None
 if 'bq_client' not in st.session_state:
     st.session_state.bq_client = None
+if 'function_urls' not in st.session_state:
+    st.session_state.function_urls = {}
 
-# Initialize BigQuery client if available
-if BQ_AVAILABLE and st.session_state.bq_client is None:
+# Function to initialize BigQuery client (can be called manually)
+def init_bigquery_client():
+    """Initialize BigQuery client and return success status."""
+    if not BQ_AVAILABLE:
+        return False, "BigQueryClient import not available"
+    
     try:
         import logging
+        import os
+        import sys
+        from pathlib import Path
+        
+        # Ensure project root is in path (in case it's not)
+        project_root = Path(__file__).parent.parent
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+        
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger(__name__)
-        logger.info("Initializing BigQuery client...")
-        st.session_state.bq_client = BigQueryClient()
+        
+        # Ensure project ID is set in environment
+        os.environ["GCP_PROJECT_ID"] = PROJECT_ID
+        
+        logger.info(f"Initializing BigQuery client for project: {PROJECT_ID}...")
+        logger.info(f"GCP_PROJECT_ID env var: {os.getenv('GCP_PROJECT_ID')}")
+        logger.info(f"Project root in path: {str(project_root) in sys.path}")
+        
+        # Verify ADC is available
+        try:
+            from google.auth import default
+            credentials, project = default()
+            logger.info(f"Application Default Credentials found. Project: {project}")
+        except Exception as auth_error:
+            logger.warning(f"Could not verify ADC: {auth_error}")
+            return False, f"Application Default Credentials not found. Please run: gcloud auth application-default login. Error: {auth_error}"
+        
+        # Try to initialize with explicit project ID
+        st.session_state.bq_client = BigQueryClient(project_id=PROJECT_ID)
+        
+        # Test the connection with a simple query (just SELECT 1, no table needed)
+        test_query = "SELECT 1 as test"
+        try:
+            result = st.session_state.bq_client.query(test_query, max_results=1)
+            logger.info(f"BigQuery connection test successful: {result}")
+        except Exception as test_error:
+            # If even basic query fails, there's a connectivity issue
+            logger.warning(f"BigQuery connection test failed: {test_error}")
+            return False, f"BigQuery connection test failed: {test_error}"
+        
         logger.info("BigQuery client initialized successfully")
+        # Clear any previous errors on success
+        if 'bq_error' in st.session_state:
+            del st.session_state.bq_error
+        return True, "BigQuery client initialized successfully"
     except Exception as e:
         import traceback
-        error_details = f"{str(e)}\n{traceback.format_exc()}"
+        error_details = f"Error: {str(e)}\n\nFull traceback:\n{traceback.format_exc()}"
         st.session_state.bq_client = None
         # Store error message for display
         st.session_state.bq_error = error_details
         import logging
         logging.error(f"BigQuery client initialization failed: {error_details}")
+        # Also print to console for debugging
+        print(f"BIGQUERY INIT ERROR: {error_details}")
+        import sys
+        sys.stderr.write(f"BIGQUERY INIT ERROR: {error_details}\n")
+        return False, error_details
+
+# Initialize BigQuery client if available
+if BQ_AVAILABLE and st.session_state.bq_client is None:
+    success, message = init_bigquery_client()
+    if not success:
+        # Error already stored in st.session_state.bq_error by init_bigquery_client
+        pass
 
 # Helper functions
 def get_function_url(function_name: str) -> str:
-    """Get Cloud Function URL."""
-    return f"{FUNCTIONS_BASE_URL}/{function_name}"
+    """Get Cloud Function URL for Gen2 functions (Cloud Run)."""
+    # Check cache first
+    if function_name in st.session_state.function_urls:
+        return st.session_state.function_urls[function_name]
+    
+    # Try to get URL from gcloud
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["gcloud", "functions", "describe", function_name, 
+             "--gen2", "--region", REGION, "--project", PROJECT_ID,
+             "--format", "value(serviceConfig.uri)"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            url = result.stdout.strip()
+            st.session_state.function_urls[function_name] = url
+            return url
+    except Exception as e:
+        # gcloud not available or function not found - will handle in call_function
+        pass
+    
+    # For Gen2 functions, we need the actual URL from Cloud Run
+    # Store None to indicate we need to fetch it
+    st.session_state.function_urls[function_name] = None
+    return None
 
 def call_function(function_name: str, data: Dict = None, method: str = "POST") -> Dict:
     """Call a Cloud Function with improved error handling."""
     url = get_function_url(function_name)
+    
+    # If URL is None, try to get it from gcloud or return error
+    if url is None:
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["gcloud", "functions", "describe", function_name, 
+                 "--gen2", "--region", REGION, "--project", PROJECT_ID,
+                 "--format", "value(serviceConfig.uri)"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                url = result.stdout.strip()
+                st.session_state.function_urls[function_name] = url
+            else:
+                return {
+                    "error": f"Cloud Function '{function_name}' is not deployed yet. Please deploy it using the deployment scripts.",
+                    "error_type": "not_deployed",
+                    "suggestion": f"Deploy using: ./scripts/deploy_phase2_functions.ps1"
+                }
+        except Exception:
+            return {
+                "error": f"Cloud Function '{function_name}' URL could not be determined. The function may not be deployed.",
+                "error_type": "not_deployed",
+                "suggestion": f"Deploy using: ./scripts/deploy_phase2_functions.ps1"
+            }
+    
     try:
+        # For Gen2 functions with --no-allow-unauthenticated, we need to add auth token
+        headers = {}
+        try:
+            # Try to get access token for authenticated requests
+            import subprocess
+            token_result = subprocess.run(
+                ["gcloud", "auth", "print-identity-token"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if token_result.returncode == 0 and token_result.stdout.strip():
+                headers["Authorization"] = f"Bearer {token_result.stdout.strip()}"
+        except Exception:
+            # If we can't get token, try without auth (might work if function allows unauthenticated)
+            pass
+        
         if method == "GET":
-            response = requests.get(url, timeout=60)
+            response = requests.get(url, headers=headers, timeout=60)
         else:
-            response = requests.post(url, json=data or {}, timeout=60)
+            response = requests.post(url, json=data or {}, headers=headers, timeout=60)
         response.raise_for_status()
         return response.json()
     except HTTPError as e:
@@ -442,7 +579,7 @@ def call_function(function_name: str, data: Dict = None, method: str = "POST") -
             return {
                 "error": f"Cloud Function '{function_name}' is not deployed yet. Please deploy it using the deployment scripts.",
                 "error_type": "not_deployed",
-                "suggestion": f"Deploy using: ./scripts/deploy_phase2_functions.sh"
+                "suggestion": f"Deploy using: ./scripts/deploy_phase2_functions.ps1"
             }
         else:
             return {
@@ -473,7 +610,14 @@ def query_bigquery(query: str, max_results: int = 100) -> List[Dict]:
     try:
         return st.session_state.bq_client.query(query, max_results=max_results)
     except Exception as e:
-        # Don't show error for missing client, it's handled at call site
+        # Handle table not found errors gracefully
+        error_str = str(e).lower()
+        if "not found" in error_str or "does not exist" in error_str or "table" in error_str:
+            # Table doesn't exist yet - return empty result
+            return []
+        # For other errors, log but don't crash
+        import logging
+        logging.getLogger(__name__).warning(f"BigQuery query error: {e}")
         return []
 
 # Google OAuth authentication
@@ -568,14 +712,18 @@ if page == "Dashboard":
             total_accounts = query_bigquery(total_accounts_query)
             total_accounts_count = total_accounts[0]['count'] if total_accounts else 0
             
-            high_priority_query = f"""
-            SELECT COUNT(DISTINCT account_id) as count
-            FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
-            WHERE score_date = CURRENT_DATE()
-            AND priority_score >= 70
-            """
-            high_priority = query_bigquery(high_priority_query)
-            high_priority_count = high_priority[0]['count'] if high_priority else 0
+            # Check if account_recommendations table exists first
+            try:
+                high_priority_query = f"""
+                SELECT COUNT(DISTINCT account_id) as count
+                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                WHERE score_date = CURRENT_DATE()
+                AND priority_score >= 70
+                """
+                high_priority = query_bigquery(high_priority_query)
+                high_priority_count = high_priority[0]['count'] if high_priority else 0
+            except Exception:
+                high_priority_count = 0
             
             unmatched_query = f"""
             SELECT COUNT(DISTINCT p.participant_id) as count
@@ -605,21 +753,148 @@ if page == "Dashboard":
         # Show helpful message when BigQuery is not available
         error_msg = ""
         if 'bq_error' in st.session_state and st.session_state.bq_error:
-            error_msg = f"\n\n**Error Details:** `{st.session_state.bq_error}`"
+            error_msg = st.session_state.bq_error
         
-        st.warning("""
+        st.error("""
         **BigQuery Client Not Available**
         
-        The app is running in demo mode. To enable full functionality:
-        1. Set up GCP credentials: `gcloud auth application-default login`
-        2. Ensure the service account has BigQuery access
-        3. Restart the application
+        The BigQuery client failed to initialize. Please check the following:
+        1. ✅ Run: `gcloud auth application-default login` (you've done this)
+        2. ✅ Verify credentials: The app should automatically use Application Default Credentials
+        3. ⚠️ Check error details below for specific issues
         
-        You can still explore the interface, but data will show as 0 until BigQuery is connected.
+        **Troubleshooting Steps:**
+        - Verify you're logged in: `gcloud auth list`
+        - Set project: `gcloud config set project maharani-sales-hub-11-2025`
+        - Set quota project: `gcloud auth application-default set-quota-project maharani-sales-hub-11-2025`
+        - Click "Retry BigQuery Connection" button below to retry initialization
+        - Restart the Streamlit app after making changes
         """)
+        
+        # Add retry button with better feedback
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.button("🔄 Retry BigQuery Connection", use_container_width=True):
+                # Clear the error and retry initialization
+                if 'bq_error' in st.session_state:
+                    del st.session_state.bq_error
+                st.session_state.bq_client = None
+                with st.spinner("Initializing BigQuery client..."):
+                    success, message = init_bigquery_client()
+                    if success:
+                        st.success("✅ " + message)
+                        st.rerun()
+                    else:
+                        st.error("❌ " + message)
+                        st.session_state.bq_error = message
+        with col2:
+            if st.button("🧪 Run Diagnostic Test", use_container_width=True):
+                with st.spinner("Running diagnostic test..."):
+                    import subprocess
+                    import os
+                    from pathlib import Path
+                    # Get project root (parent of web_app directory)
+                    project_root = Path(__file__).parent.parent
+                    test_script = project_root / "test_bq_init.py"
+                    
+                    if test_script.exists():
+                        result = subprocess.run(
+                            ["python", str(test_script)],
+                            capture_output=True,
+                            text=True,
+                            cwd=str(project_root)
+                        )
+                        st.code(result.stdout, language="text")
+                        if result.stderr:
+                            st.code(result.stderr, language="text")
+                    else:
+                        st.error(f"Test script not found at: {test_script}")
+                        # Run inline test - use the BigQueryClient that's already imported
+                        st.info("Running inline diagnostic test...")
+                        try:
+                            import os
+                            
+                            os.environ["GCP_PROJECT_ID"] = PROJECT_ID
+                            
+                            # Test 1: ADC
+                            from google.auth import default
+                            creds, proj = default()
+                            st.success(f"✅ ADC working! Project: {proj}")
+                            
+                            # Test 2: Check if BigQueryClient is available
+                            if not BQ_AVAILABLE:
+                                st.error("❌ BigQueryClient not available - import failed at startup")
+                                st.warning("Trying to import BigQueryClient now...")
+                                # Try to import now with path set
+                                try:
+                                    if str(project_root) not in sys.path:
+                                        sys.path.insert(0, str(project_root))
+                                    from utils.bigquery_client import BigQueryClient
+                                    st.success("✅ BigQueryClient imported successfully!")
+                                    # Now try to use it
+                                    client = BigQueryClient(project_id=PROJECT_ID)
+                                    st.success("✅ BigQueryClient created")
+                                    result = client.query("SELECT 1 as test", max_results=1)
+                                    st.success(f"✅ Query successful: {result}")
+                                    st.success("🎉 All diagnostic tests passed! BigQuery should work.")
+                                    st.info("💡 The import failed at startup but works now. Try restarting Streamlit.")
+                                except ImportError as import_err:
+                                    st.error(f"❌ Import still failed: {import_err}")
+                                    st.info(f"Project root: {project_root}")
+                                    st.info(f"Utils exists: {(project_root / 'utils').exists()}")
+                            else:
+                                st.success("✅ BigQueryClient is available (imported at startup)")
+                                
+                                # Test 3: Initialize
+                                client = BigQueryClient(project_id=PROJECT_ID)
+                                st.success("✅ BigQueryClient created")
+                                
+                                # Test 4: Query
+                                result = client.query("SELECT 1 as test", max_results=1)
+                                st.success(f"✅ Query successful: {result}")
+                                
+                                st.success("🎉 All diagnostic tests passed! BigQuery should work.")
+                        except Exception as e:
+                            import traceback
+                            st.error(f"❌ Test failed: {str(e)}")
+                            with st.expander("Full traceback"):
+                                st.code(traceback.format_exc(), language="text")
+                            # Show debug info
+                            with st.expander("Debug Info"):
+                                st.code(f"""
+BQ_AVAILABLE: {BQ_AVAILABLE}
+Project root: {project_root}
+sys.path (first 5): {sys.path[:5]}
+Current working directory: {os.getcwd()}
+__file__: {__file__}
+                                """, language="text")
+        
         if error_msg:
-            with st.expander("Error Details"):
-                st.code(error_msg[:500])
+            with st.expander("🔍 Detailed Error Information", expanded=True):
+                st.code(error_msg, language="text")
+                st.info("💡 **Tip:** Copy this error and check if it's a permissions issue or missing dataset.")
+                
+                # Try to diagnose common issues
+                error_lower = error_msg.lower()
+                if "credentials" in error_lower or "authentication" in error_lower:
+                    st.warning("""
+                    **Credentials Issue Detected:**
+                    - Run: `gcloud auth application-default login`
+                    - Verify: `gcloud auth list`
+                    - Set quota: `gcloud auth application-default set-quota-project maharani-sales-hub-11-2025`
+                    """)
+                elif "permission" in error_lower or "denied" in error_lower:
+                    st.warning("""
+                    **Permission Issue Detected:**
+                    - Your account may not have BigQuery access
+                    - Contact Anand to grant BigQuery Data Viewer and Job User roles
+                    """)
+                elif "not found" in error_lower or "does not exist" in error_lower:
+                    st.info("""
+                    **Table/Dataset Not Found:**
+                    - This might be normal if data hasn't been synced yet
+                    - The app will work once data is available
+                    """)
         total_accounts_count = high_priority_count = unmatched_count = opportunities_count = 0
     
     # Metric cards
@@ -671,27 +946,30 @@ gcloud functions deploy account-scoring \\
     # Display top accounts
     if st.session_state.bq_client:
         try:
-            top_accounts_query = f"""
-            SELECT 
-                a.account_name,
-                r.priority_score,
-                r.budget_likelihood,
-                r.engagement_score,
-                r.recommended_action,
-                r.last_interaction_date
-            FROM `{PROJECT_ID}.sales_intelligence.account_recommendations` r
-            JOIN `{PROJECT_ID}.sales_intelligence.sf_accounts` a
-                ON r.account_id = a.account_id
-            WHERE r.score_date = CURRENT_DATE()
-            ORDER BY r.priority_score DESC
-            LIMIT 20
-            """
-            top_accounts = query_bigquery(top_accounts_query)
-            if top_accounts:
-                df = pd.DataFrame(top_accounts)
-                st.dataframe(df, use_container_width=True, hide_index=True)
-            else:
-                st.info("No account scores available for today. Click 'Refresh Account Scores' to generate.")
+            try:
+                top_accounts_query = f"""
+                SELECT 
+                    a.account_name,
+                    r.priority_score,
+                    r.budget_likelihood,
+                    r.engagement_score,
+                    r.recommended_action,
+                    r.last_interaction_date
+                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations` r
+                JOIN `{PROJECT_ID}.sales_intelligence.sf_accounts` a
+                    ON r.account_id = a.account_id
+                WHERE r.score_date = CURRENT_DATE()
+                ORDER BY r.priority_score DESC
+                LIMIT 20
+                """
+                top_accounts = query_bigquery(top_accounts_query)
+                if top_accounts:
+                    df = pd.DataFrame(top_accounts)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No account scores available for today. Click 'Refresh Account Scores' to generate.")
+            except Exception as e:
+                st.info("Account scoring has not been run yet. Click 'Refresh Account Scores' to generate scores.")
         except Exception as e:
             st.error(f"Error loading accounts: {str(e)}")
     else:
@@ -745,7 +1023,15 @@ elif page == "Account Scoring":
                 dist_data = query_bigquery(dist_query)
                 if dist_data:
                     df_dist = pd.DataFrame(dist_data)
-                    st.bar_chart(df_dist.set_index('score_range'))
+                    if not df_dist.empty and 'count' in df_dist.columns:
+                        # Set index and ensure count column is numeric
+                        df_dist = df_dist.set_index('score_range')
+                        df_dist['count'] = pd.to_numeric(df_dist['count'], errors='coerce')
+                        st.bar_chart(df_dist)
+                    else:
+                        st.info("No distribution data available")
+                else:
+                    st.info("No distribution data available")
             except Exception as e:
                 st.info("No distribution data available")
         
@@ -768,7 +1054,15 @@ elif page == "Account Scoring":
                 budget_data = query_bigquery(budget_query)
                 if budget_data:
                     df_budget = pd.DataFrame(budget_data)
-                    st.bar_chart(df_budget.set_index('likelihood_range'))
+                    if not df_budget.empty and 'count' in df_budget.columns:
+                        # Set index and ensure count column is numeric
+                        df_budget = df_budget.set_index('likelihood_range')
+                        df_budget['count'] = pd.to_numeric(df_budget['count'], errors='coerce')
+                        st.bar_chart(df_budget)
+                    else:
+                        st.info("No budget likelihood data available")
+                else:
+                    st.info("No budget likelihood data available")
             except Exception as e:
                 st.info("No budget likelihood data available")
         
@@ -984,11 +1278,13 @@ elif page == "Account Details":
                 WHERE account_id = @account_id OR account_name LIKE @account_name
                 LIMIT 1
                 """
-                # Simplified query
+                # Use parameterized query to prevent SQL injection
+                # Escape single quotes in search term
+                safe_search = account_search.replace("'", "''")
                 account_query = f"""
                 SELECT *
                 FROM `{PROJECT_ID}.sales_intelligence.sf_accounts`
-                WHERE account_id = '{account_search}' OR account_name LIKE '%{account_search}%'
+                WHERE account_id = '{safe_search}' OR account_name LIKE '%{safe_search}%'
                 LIMIT 1
                 """
                 accounts = query_bigquery(account_query)
@@ -996,6 +1292,8 @@ elif page == "Account Details":
                 if accounts:
                     account = accounts[0]
                     account_id = account['account_id']
+                    # Escape account_id to prevent SQL injection (define once for all tabs)
+                    safe_account_id = account_id.replace("'", "''")
                     
                     st.subheader(f"Account: {account.get('account_name', 'Unknown')}")
                     
@@ -1005,20 +1303,32 @@ elif page == "Account Details":
                     ])
                     
                     with tab1:
-                        st.json(account)
+                        try:
+                            st.json(account)
+                        except Exception as e:
+                            st.error(f"Error displaying account data: {str(e)}")
+                            st.write("**Account Data:**")
+                            for key, value in account.items():
+                                st.write(f"**{key}:** {value}")
                         
                         # Get latest score
                         score_query = f"""
                         SELECT *
                         FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
-                        WHERE account_id = '{account_id}'
+                        WHERE account_id = '{safe_account_id}'
                         ORDER BY score_date DESC
                         LIMIT 1
                         """
                         scores = query_bigquery(score_query)
                         if scores:
                             st.subheader("Latest Account Score")
-                            st.json(scores[0])
+                            try:
+                                st.json(scores[0])
+                            except Exception as e:
+                                st.error(f"Error displaying score data: {str(e)}")
+                                st.write("**Score Data:**")
+                                for key, value in scores[0].items():
+                                    st.write(f"**{key}:** {value}")
                     
                     with tab2:
                         email_query = f"""
@@ -1030,7 +1340,7 @@ elif page == "Account Details":
                         FROM `{PROJECT_ID}.sales_intelligence.gmail_messages` m
                         JOIN `{PROJECT_ID}.sales_intelligence.gmail_participants` p
                             ON m.message_id = p.message_id
-                        WHERE p.sf_account_id = '{account_id}'
+                        WHERE p.sf_account_id = '{safe_account_id}'
                         ORDER BY m.sent_at DESC
                         LIMIT 20
                         """
@@ -1050,7 +1360,7 @@ elif page == "Account Details":
                             call_time,
                             sentiment_score
                         FROM `{PROJECT_ID}.sales_intelligence.dialpad_calls`
-                        WHERE matched_account_id = '{account_id}'
+                        WHERE matched_account_id = '{safe_account_id}'
                         ORDER BY call_time DESC
                         LIMIT 20
                         """
@@ -1064,7 +1374,7 @@ elif page == "Account Details":
                         opp_query = f"""
                         SELECT *
                         FROM `{PROJECT_ID}.sales_intelligence.sf_opportunities`
-                        WHERE account_id = '{account_id}'
+                        WHERE account_id = '{safe_account_id}'
                         ORDER BY created_date DESC
                         """
                         opps = query_bigquery(opp_query)
@@ -1077,7 +1387,7 @@ elif page == "Account Details":
                         all_scores_query = f"""
                         SELECT *
                         FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
-                        WHERE account_id = '{account_id}'
+                        WHERE account_id = '{safe_account_id}'
                         ORDER BY score_date DESC
                         LIMIT 30
                         """
@@ -1103,7 +1413,8 @@ elif page == "Email Threads":
     if thread_search:
         if st.session_state.bq_client:
             try:
-                # Get thread
+                # Get thread - escape search term to prevent SQL injection
+                safe_thread_search = thread_search.replace("'", "''")
                 thread_query = f"""
                 SELECT 
                     message_id,
@@ -1114,7 +1425,7 @@ elif page == "Email Threads":
                     sent_at,
                     body_text
                 FROM `{PROJECT_ID}.sales_intelligence.gmail_messages`
-                WHERE thread_id = '{thread_search}' OR from_email = '{thread_search}'
+                WHERE thread_id = '{safe_thread_search}' OR from_email = '{safe_thread_search}'
                 ORDER BY sent_at ASC
                 """
                 thread_emails = query_bigquery(thread_query)
@@ -1123,17 +1434,29 @@ elif page == "Email Threads":
                     st.subheader(f"Thread: {thread_emails[0].get('subject', 'No subject')}")
                     
                     # Display thread
-                    for email in thread_emails:
-                        with st.expander(f"{email.get('from_email')} - {email.get('sent_at')}"):
-                            st.write(email.get('body_text', ''))
+                    for idx, email in enumerate(thread_emails):
+                        email_from = email.get('from_email', 'Unknown')
+                        email_date = email.get('sent_at', 'Unknown date')
+                        email_body = email.get('body_text', 'No content')
+                        with st.expander(f"{email_from} - {email_date}"):
+                            st.write("**Subject:**", email.get('subject', 'No subject'))
+                            st.write("**Body:**")
+                            st.write(email_body)
                     
                     # AI Reply Generation
                     st.subheader("🤖 Generate AI Reply")
                     
-                    message_id = st.selectbox(
+                    # Create options for selectbox with message preview
+                    message_options = [
+                        f"{e.get('from_email', 'Unknown')} - {e.get('subject', 'No subject')[:50]}"
+                        for e in thread_emails
+                    ]
+                    selected_idx = st.selectbox(
                         "Select message to reply to:",
-                        [e['message_id'] for e in thread_emails]
+                        range(len(thread_emails)),
+                        format_func=lambda x: message_options[x] if x < len(message_options) else "Unknown"
                     )
+                    message_id = thread_emails[selected_idx]['message_id'] if thread_emails else None
                     
                     if st.button("Generate Reply"):
                         if message_id:

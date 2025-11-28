@@ -1,23 +1,23 @@
 """
-Root main.py wrapper for Cloud Functions Gen2 deployment
-This file satisfies Gen2 requirements but actual functions are in cloud_functions/*/main.py
+Root-level main.py for Gen2 Cloud Functions deployment.
+This file makes all intelligence functions available for deployment.
 """
-# For Gen2, we need main.py but functions-framework will use the entry-point parameter
-# This file exists to satisfy the requirement
-# Actual function entry points are specified via --entry-point flag
+# Import all function entry points so they can be used as entry points
+from intelligence.embeddings.main import generate_embeddings
+from intelligence.scoring.main import account_scoring_job
+from intelligence.nlp_query.main import nlp_query
+from intelligence.automation.main import create_leads, enroll_hubspot, get_hubspot_sequences
+from intelligence.email_replies.main import generate_email_reply
+from intelligence.vector_search.main import semantic_search
 
-# Import all functions so they can be discovered by functions-framework
-from cloud_functions.gmail_sync.main import gmail_sync
-from cloud_functions.salesforce_sync.main import salesforce_sync
-from cloud_functions.dialpad_sync.main import dialpad_sync
-from cloud_functions.hubspot_sync.main import hubspot_sync
-from cloud_functions.entity_resolution.main import entity_resolution
-
-# Export functions for functions-framework discovery
+# Re-export for easier access
 __all__ = [
-    'gmail_sync',
-    'salesforce_sync',
-    'dialpad_sync',
-    'hubspot_sync',
-    'entity_resolution'
+    'generate_embeddings',
+    'account_scoring_job',
+    'nlp_query',
+    'create_leads',
+    'enroll_hubspot',
+    'get_hubspot_sequences',
+    'generate_email_reply',
+    'semantic_search'
 ]
