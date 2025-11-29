@@ -47,9 +47,15 @@ class AccountScorer:
                     warnings.filterwarnings("ignore", category=UserWarning)
                     warnings.filterwarnings("ignore", message=".*pkg_resources.*")
                     aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
+                
+                # Import vertexai first to ensure it's available
+                import vertexai
                 from vertexai.generative_models import GenerativeModel
                 self.model = GenerativeModel(self.llm_model)
                 self.client = None
+            except ImportError as e:
+                logger.error(f"Failed to import Vertex AI: {e}")
+                raise ValueError(f"Vertex AI package not found. Ensure 'vertexai' package is installed. Error: {e}")
             except Exception as e:
                 logger.error(f"Failed to initialize Vertex AI: {e}")
                 raise ValueError(f"Vertex AI initialization failed: {e}. Ensure Vertex AI API is enabled and service account has permissions.")
@@ -102,7 +108,7 @@ class AccountScorer:
         JOIN `{self.bq_client.project_id}.{self.bq_client.dataset_id}.gmail_participants` p
           ON m.message_id = p.message_id
         WHERE p.sf_account_id = @account_id
-          AND m.sent_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+          AND m.sent_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
         ORDER BY m.sent_at DESC
         LIMIT 5
         """
@@ -123,7 +129,7 @@ class AccountScorer:
             direction
         FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.dialpad_calls`
         WHERE matched_account_id = @account_id
-          AND call_time >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+          AND call_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
         ORDER BY call_time DESC
         LIMIT 3
         """
@@ -155,7 +161,7 @@ class AccountScorer:
             activity_date
         FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_activities`
         WHERE matched_account_id = @account_id
-          AND activity_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+          AND activity_date >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
         ORDER BY activity_date DESC
         LIMIT 10
         """
@@ -332,22 +338,28 @@ Respond in JSON format:
         logger.info(f"Scoring {len(accounts)} accounts")
         
         scored_count = 0
-        recommendations = []
+        batch_size = 10  # Process 10 accounts at a time to avoid memory issues
         
-        for account in accounts:
-            try:
-                account_id = account["account_id"]
-                recommendation = self.score_account(account_id)
-                recommendations.append(recommendation)
-                scored_count += 1
-            except Exception as e:
-                logger.error(f"Failed to score account {account.get('account_id')}: {e}")
+        for i in range(0, len(accounts), batch_size):
+            batch = accounts[i:i + batch_size]
+            batch_recommendations = []
+            
+            for account in batch:
+                try:
+                    account_id = account["account_id"]
+                    recommendation = self.score_account(account_id)
+                    batch_recommendations.append(recommendation)
+                    scored_count += 1
+                except Exception as e:
+                    logger.error(f"Failed to score account {account.get('account_id')}: {e}")
+            
+            # Insert batch to BigQuery to free memory
+            if batch_recommendations:
+                self.bq_client.insert_rows("account_recommendations", batch_recommendations)
+                logger.info(f"Inserted batch of {len(batch_recommendations)} recommendations (total: {scored_count})")
+                batch_recommendations = []  # Clear batch to free memory
         
-        # Insert recommendations to BigQuery
-        if recommendations:
-            self.bq_client.insert_rows("account_recommendations", recommendations)
-            logger.info(f"Inserted {len(recommendations)} recommendations")
-        
+        logger.info(f"Completed scoring {scored_count} accounts")
         return scored_count
 
 
