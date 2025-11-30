@@ -327,37 +327,62 @@ Respond in JSON format:
         return "\n".join(prompt_parts)
     
     def score_all_accounts(self) -> int:
-        """Score all active accounts. Returns count of accounts scored."""
-        query = f"""
-        SELECT DISTINCT account_id
+        """Score all active accounts. Returns count of accounts scored.
+        
+        Memory-optimized: Processes accounts one at a time and inserts immediately
+        to prevent memory overflow.
+        """
+        import gc
+        
+        # First, get total count for logging
+        count_query = f"""
+        SELECT COUNT(DISTINCT account_id) as total
         FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_accounts`
         WHERE account_id IS NOT NULL
         """
-        
-        accounts = self.bq_client.query(query)
-        logger.info(f"Scoring {len(accounts)} accounts")
+        count_result = self.bq_client.query(count_query)
+        total_accounts = count_result[0]["total"] if count_result else 0
+        logger.info(f"Scoring {total_accounts} accounts (processing one at a time to save memory)")
         
         scored_count = 0
-        batch_size = 10  # Process 10 accounts at a time to avoid memory issues
+        offset = 0
+        chunk_size = 50  # Fetch 50 account IDs at a time from BigQuery
         
-        for i in range(0, len(accounts), batch_size):
-            batch = accounts[i:i + batch_size]
-            batch_recommendations = []
+        while offset < total_accounts:
+            # Fetch a chunk of account IDs
+            query = f"""
+            SELECT DISTINCT account_id
+            FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_accounts`
+            WHERE account_id IS NOT NULL
+            ORDER BY account_id
+            LIMIT {chunk_size}
+            OFFSET {offset}
+            """
             
-            for account in batch:
+            accounts_chunk = self.bq_client.query(query)
+            
+            # Process each account one at a time and insert immediately
+            for account in accounts_chunk:
                 try:
                     account_id = account["account_id"]
                     recommendation = self.score_account(account_id)
-                    batch_recommendations.append(recommendation)
+                    
+                    # Insert immediately (one at a time) to free memory
+                    self.bq_client.insert_rows("account_recommendations", [recommendation])
                     scored_count += 1
+                    
+                    # Force garbage collection every 5 accounts
+                    if scored_count % 5 == 0:
+                        gc.collect()
+                        logger.info(f"Processed {scored_count}/{total_accounts} accounts")
+                    
                 except Exception as e:
                     logger.error(f"Failed to score account {account.get('account_id')}: {e}")
+                    # Continue with next account even if one fails
             
-            # Insert batch to BigQuery to free memory
-            if batch_recommendations:
-                self.bq_client.insert_rows("account_recommendations", batch_recommendations)
-                logger.info(f"Inserted batch of {len(batch_recommendations)} recommendations (total: {scored_count})")
-                batch_recommendations = []  # Clear batch to free memory
+            offset += chunk_size
+            # Force garbage collection after each chunk
+            gc.collect()
         
         logger.info(f"Completed scoring {scored_count} accounts")
         return scored_count
