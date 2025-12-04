@@ -11,9 +11,30 @@ $SERVICE_ACCOUNT = "${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.co
 Write-Host "Deploying Phase 2 Cloud Functions to project: $PROJECT_ID" -ForegroundColor Green
 Write-Host "Using service account: $SERVICE_ACCOUNT" -ForegroundColor Green
 
-# Get project root
-$PROJECT_ROOT = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
-Set-Location $PROJECT_ROOT
+# Get project root - use current directory if script is run from project root, otherwise calculate
+if (Test-Path "main.py") {
+    $PROJECT_ROOT = Get-Location
+    Write-Host "Using current directory as project root: $PROJECT_ROOT" -ForegroundColor Gray
+} else {
+    # Try to find project root relative to script location
+    $scriptPath = $MyInvocation.MyCommand.Path
+    if ($scriptPath) {
+        $PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $scriptPath)
+    } else {
+        # Fallback: assume we're in scripts directory
+        $PROJECT_ROOT = Split-Path -Parent (Get-Location)
+    }
+    Set-Location $PROJECT_ROOT
+    Write-Host "Changed to project root: $PROJECT_ROOT" -ForegroundColor Gray
+}
+
+# Verify main.py exists
+if (-not (Test-Path "main.py")) {
+    Write-Host "ERROR: main.py not found in $PROJECT_ROOT" -ForegroundColor Red
+    Write-Host "Current directory: $(Get-Location)" -ForegroundColor Red
+    Write-Host "Please run this script from the project root directory" -ForegroundColor Red
+    exit 1
+}
 
 # Deploy Embeddings Generator
 Write-Host "Deploying Embeddings Generator Function..." -ForegroundColor Yellow
