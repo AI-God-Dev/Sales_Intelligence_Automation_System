@@ -45,6 +45,9 @@ secrets/
 credentials.json
 token.json
 service-account*.json
+*-key.json
+web-app-runtime-sa-key.json
+account-scoring-sa-key.json
 
 # GCP
 .gcloud/

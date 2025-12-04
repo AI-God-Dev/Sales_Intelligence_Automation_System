@@ -400,6 +400,9 @@ st.set_page_config(
 # Configuration
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
 REGION = os.getenv("GCP_REGION", "us-central1")
+# Note: For local dev, use your Google account (gcloud auth login) - you have run.invoker permission
+# For production, web-app-runtime-sa automatically has run.invoker permission
+# No service account impersonation needed - use Application Default Credentials directly
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 
 # Initialize session state
@@ -492,31 +495,85 @@ def get_function_url(function_name: str) -> str:
     """Get Cloud Function URL for Gen2 functions (Cloud Run)."""
     # Check cache first
     if function_name in st.session_state.function_urls:
-        return st.session_state.function_urls[function_name]
+        cached_url = st.session_state.function_urls[function_name]
+        if cached_url:  # Only return if not None
+            return cached_url
     
-    # Try to get URL from gcloud
+    # Try using Google Cloud Functions client library first (most reliable)
     try:
-        import subprocess
+        from google.cloud import functions_v2
+        client = functions_v2.FunctionServiceClient()
+        parent = f"projects/{PROJECT_ID}/locations/{REGION}"
+        function_path = f"{parent}/functions/{function_name}"
+        
+        function_obj = client.get_function(name=function_path)
+        if function_obj.service_config:
+            # Get the Cloud Run service URL
+            url = function_obj.service_config.uri
+            if url:
+                st.session_state.function_urls[function_name] = url
+                return url
+        # Fallback to the top-level URL
+        if hasattr(function_obj, 'url') and function_obj.url:
+            st.session_state.function_urls[function_name] = function_obj.url
+            return function_obj.url
+    except Exception as e:
+        # Client library not available or failed, try subprocess
+        pass
+    
+    # Fallback: Try subprocess with gcloud
+    import subprocess
+    import shutil
+    
+    # Check if gcloud is available
+    gcloud_path = shutil.which("gcloud")
+    if not gcloud_path:
+        # gcloud not in PATH, use constructed URL
+        url = f"https://{REGION}-{PROJECT_ID}.cloudfunctions.net/{function_name}"
+        st.session_state.function_urls[function_name] = url
+        return url
+    
+    # Method 1: Try top-level url field (Cloud Functions URL) - More stable than direct Cloud Run URL
+    try:
         result = subprocess.run(
-            ["gcloud", "functions", "describe", function_name, 
+            [gcloud_path, "functions", "describe", function_name, 
              "--gen2", "--region", REGION, "--project", PROJECT_ID,
-             "--format", "value(serviceConfig.uri)"],
+             "--format", "value(url)"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=10,
+            shell=False
         )
         if result.returncode == 0 and result.stdout.strip():
             url = result.stdout.strip()
             st.session_state.function_urls[function_name] = url
             return url
     except Exception as e:
-        # gcloud not available or function not found - will handle in call_function
         pass
     
-    # For Gen2 functions, we need the actual URL from Cloud Run
-    # Store None to indicate we need to fetch it
-    st.session_state.function_urls[function_name] = None
-    return None
+    # Method 2: Try serviceConfig.uri (Cloud Run direct URL) - Fallback if Cloud Functions URL not available
+    try:
+        result = subprocess.run(
+            [gcloud_path, "functions", "describe", function_name, 
+             "--gen2", "--region", REGION, "--project", PROJECT_ID,
+             "--format", "value(serviceConfig.uri)"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            shell=False
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            url = result.stdout.strip()
+            st.session_state.function_urls[function_name] = url
+            return url
+    except Exception as e:
+        pass
+    
+    # Method 3: Construct URL from known pattern (final fallback)
+    # Gen2 functions have a predictable URL pattern
+    url = f"https://{REGION}-{PROJECT_ID}.cloudfunctions.net/{function_name}"
+    st.session_state.function_urls[function_name] = url
+    return url
 
 def call_function(function_name: str, data: Dict = None, method: str = "POST") -> Dict:
     """Call a Cloud Function with improved error handling."""
@@ -551,29 +608,173 @@ def call_function(function_name: str, data: Dict = None, method: str = "POST") -
             }
     
     try:
-        # For Gen2 functions with --no-allow-unauthenticated, we need to add auth token
+        # For Gen2 functions (Cloud Run), we need an identity token with the service URL as audience
+        # Following Anand's approach:
+        # - Local dev: Use your Google account (via gcloud auth login) - you have run.invoker permission
+        # - Production: web-app-runtime-sa automatically has run.invoker permission
+        # - Get ID token directly using Application Default Credentials (no impersonation needed)
+        token = None
         headers = {}
+        auth_lib_error = None
+        
+        # Method 1: Use Google Auth library to get ID token directly (Anand's recommended approach)
         try:
-            # Try to get access token for authenticated requests
-            import subprocess
-            token_result = subprocess.run(
-                ["gcloud", "auth", "print-identity-token"],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if token_result.returncode == 0 and token_result.stdout.strip():
-                headers["Authorization"] = f"Bearer {token_result.stdout.strip()}"
-        except Exception:
-            # If we can't get token, try without auth (might work if function allows unauthenticated)
+            from google.auth import default
+            from google.auth.transport import requests as google_requests
+            from google.oauth2 import id_token
+            
+            # Explicitly get Application Default Credentials
+            credentials, project = default()
+            
+            # Refresh credentials if needed
+            request = google_requests.Request()
+            if not credentials.valid:
+                credentials.refresh(request)
+            
+            # Get identity token for the Cloud Run service URL (audience)
+            # Uses Application Default Credentials (your user account in local dev, service account in production)
+            token = id_token.fetch_id_token(request, url)
+            if token:
+                headers = {"Authorization": f"Bearer {token}"}
+                import logging
+                logging.info("Successfully obtained ID token using Google Auth library")
+        except Exception as auth_error:
+            auth_lib_error = auth_error
+            import logging
+            logging.warning(f"ID token fetch failed: {str(auth_error)}")
+            # Will try gcloud command fallback
             pass
         
-        if method == "GET":
-            response = requests.get(url, headers=headers, timeout=60)
-        else:
-            response = requests.post(url, json=data or {}, headers=headers, timeout=60)
-        response.raise_for_status()
-        return response.json()
+        # If we got a token from Method 1, use it
+        if token and headers:
+            # Retry logic for 503 errors (cold start)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if method == "GET":
+                        response = requests.get(url, headers=headers, timeout=60)
+                    else:
+                        response = requests.post(url, json=data or {}, headers=headers, timeout=60)
+                    response.raise_for_status()
+                    return response.json()
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code == 503 and attempt < max_retries - 1:
+                        # Service is starting up, wait and retry
+                        import time
+                        wait_time = (attempt + 1) * 2  # 2s, 4s, 6s
+                        import logging
+                        logging.info(f"Service unavailable (503), retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})...")
+                        time.sleep(wait_time)
+                        continue
+                    raise
+        
+        # Fallback 1: Use gcloud functions call command (handles authentication automatically)
+        # This is the most reliable method for local development
+        try:
+            import subprocess
+            import shutil
+            import json
+            gcloud_path = shutil.which("gcloud")
+            if gcloud_path:
+                # Use gcloud functions call which handles authentication automatically
+                cmd = [
+                    gcloud_path, "functions", "call", function_name,
+                    "--gen2",
+                    "--region", REGION,
+                    "--project", PROJECT_ID
+                ]
+                if method == "POST" and data:
+                    cmd.extend(["--data", json.dumps(data)])
+                
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=120  # Functions can take time
+                )
+                
+                if result.returncode == 0:
+                    # Try to parse JSON response
+                    try:
+                        return json.loads(result.stdout)
+                    except json.JSONDecodeError:
+                        # If not JSON, return the raw output
+                        return {"result": result.stdout, "message": "Function executed successfully"}
+                else:
+                    # Log the error but continue to next fallback
+                    import logging
+                    logging.warning(f"gcloud functions call failed: {result.stderr}")
+                    # Check if it's a 503 error (service unavailable) - return immediately
+                    if "503" in result.stderr or "Service Unavailable" in result.stderr:
+                        return {
+                            "error": "Cloud Run service is temporarily unavailable (503 error).",
+                            "error_type": "service_unavailable",
+                            "suggestion": "The Cloud Run service may be starting up, experiencing issues, or needs to be restarted. Please:\n1. Wait 1-2 minutes and try again (cold start)\n2. Contact Anand with this error message\n3. The service may need to be checked/restarted in GCP Console"
+                        }
+        except Exception as gcloud_error:
+            import logging
+            error_str = str(gcloud_error)
+            logging.warning(f"gcloud functions call exception: {gcloud_error}")
+            # Check if it's a 503 error in the exception message
+            if "503" in error_str or "Service Unavailable" in error_str:
+                return {
+                    "error": "Cloud Run service is temporarily unavailable (503 error).",
+                    "error_type": "service_unavailable",
+                    "suggestion": "The Cloud Run service may be starting up, experiencing issues, or needs to be restarted. Please:\n1. Wait 1-2 minutes and try again (cold start)\n2. Contact Anand with this error message\n3. The service may need to be checked/restarted in GCP Console"
+                }
+            pass
+        
+        # Fallback 2: Try gcloud auth print-identity-token (without --audiences for user accounts)
+        # Note: This may not work for user accounts, but we try it as a last resort
+        try:
+            import subprocess
+            import shutil
+            gcloud_path = shutil.which("gcloud")
+            if gcloud_path:
+                # Try without --audiences first (works for some account types)
+                token_result = subprocess.run(
+                    [gcloud_path, "auth", "print-identity-token"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if token_result.returncode == 0 and token_result.stdout.strip():
+                    token = token_result.stdout.strip()
+                    headers = {"Authorization": f"Bearer {token}"}
+                    if method == "GET":
+                        response = requests.get(url, headers=headers, timeout=60)
+                    else:
+                        response = requests.post(url, json=data or {}, headers=headers, timeout=60)
+                    response.raise_for_status()
+                    return response.json()
+                else:
+                    # Log the error for debugging
+                    import logging
+                    logging.warning(f"gcloud identity token failed: {token_result.stderr}")
+        except Exception as gcloud_error:
+            import logging
+            logging.warning(f"gcloud identity token exception: {gcloud_error}")
+            pass
+        
+        # If all methods fail, return error with helpful message
+        error_msg = f"Could not authenticate with Cloud Run service."
+        if auth_lib_error:
+            error_msg += f" Primary method failed: {str(auth_lib_error)}"
+        
+        # Check if it's a 503 error (service unavailable)
+        error_str = str(auth_lib_error) if auth_lib_error else ""
+        if "503" in error_str or "Service Unavailable" in error_str:
+            return {
+                "error": "Cloud Run service is temporarily unavailable (503 error).",
+                "error_type": "service_unavailable",
+                "suggestion": "The Cloud Run service may be starting up or experiencing issues. Please wait a few moments and try again. If the problem persists, check the Cloud Run service status in GCP Console or ask Anand to verify the service is running."
+            }
+        
+        return {
+            "error": error_msg,
+            "error_type": "auth_error",
+            "suggestion": f"All authentication methods failed. Please ensure:\n1. You're logged in with: gcloud auth login\n2. Project is set: gcloud config set project maharani-sales-hub-11-2025\n3. Application Default Credentials are set: gcloud auth application-default login\n4. You have run.invoker permission on the Cloud Run service (ask Anand if needed).\n\nIf you see a 503 error, the service may be starting up - wait a moment and try again."
+        }
     except HTTPError as e:
         if e.response.status_code == 404:
             return {
@@ -581,9 +782,26 @@ def call_function(function_name: str, data: Dict = None, method: str = "POST") -
                 "error_type": "not_deployed",
                 "suggestion": f"Deploy using: ./scripts/deploy_phase2_functions.ps1"
             }
-        else:
+        elif e.response.status_code == 401:
             return {
-                "error": f"HTTP {e.response.status_code}: {str(e)}",
+                "error": f"HTTP 401: Unauthorized. The authentication token is invalid or expired. This usually means the identity token doesn't have the correct audience for the Cloud Run service.",
+                "error_type": "auth_error",
+                "suggestion": "Try refreshing the page or re-authenticating. If the issue persists, we may need to use service account impersonation for Cloud Run authentication."
+            }
+        elif e.response.status_code == 403:
+            return {
+                "error": f"HTTP 403: Permission denied. You don't have permission to invoke '{function_name}'. Please ask Anand to grant you the 'run.invoker' role on the Cloud Run service.",
+                "error_type": "permission_denied",
+                "suggestion": f"Ask Anand to run: gcloud run services add-iam-policy-binding {function_name} --region={REGION} --member='user:atajanbaratov360@gmail.com' --role='roles/run.invoker' --project={PROJECT_ID}"
+            }
+        else:
+            error_text = str(e)
+            try:
+                error_text = e.response.text[:500] if e.response.text else str(e)
+            except:
+                pass
+            return {
+                "error": f"HTTP {e.response.status_code}: {error_text}",
                 "error_type": "http_error"
             }
     except ConnectionError as e:

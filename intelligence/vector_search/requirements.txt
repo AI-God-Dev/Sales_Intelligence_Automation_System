@@ -1,4 +1,5 @@
 functions-framework>=3.5.0
 google-cloud-bigquery>=3.13.0
-google-cloud-aiplatform>=1.38.0
+# vertexai will automatically pull in the correct google-cloud-aiplatform version
+vertexai>=1.38.0
 
