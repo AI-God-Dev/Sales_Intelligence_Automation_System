@@ -1132,9 +1132,17 @@ __file__: {__file__}
     # Top priority accounts
     st.subheader("Top Priority Accounts")
     
+    # Test mode option for Dashboard
+    test_mode_dashboard = st.checkbox("🧪 Test Mode (10 accounts)", value=False, key="dashboard_test", help="Test with only 10 accounts for faster testing")
+    
     if st.button("Refresh Account Scores"):
+        request_data = {}
+        if test_mode_dashboard:
+            request_data = {"limit": 10}
+            st.info("🧪 Test Mode: Scoring only 10 accounts for testing purposes")
+        
         with st.spinner("Refreshing account scores..."):
-            result = call_function("account-scoring", {})
+            result = call_function("account-scoring", request_data)
             if "error" in result:
                 error_type = result.get("error_type", "unknown")
                 if error_type == "not_deployed":
@@ -1228,9 +1236,16 @@ elif page == "Account Scoring":
     # Refresh button at top
     col_refresh1, col_refresh2, col_refresh3 = st.columns([1, 1, 3])
     with col_refresh1:
+        test_mode = st.checkbox("🧪 Test Mode (10 accounts)", value=False, help="Test with only 10 accounts for faster testing")
+    with col_refresh2:
         if st.button("🔄 Refresh Account Scores", type="primary"):
+            request_data = {}
+            if test_mode:
+                request_data = {"limit": 10}
+                st.info("🧪 Test Mode: Scoring only 10 accounts for testing purposes")
+            
             with st.spinner("Refreshing account scores... This may take a few minutes."):
-                result = call_function("account-scoring", {})
+                result = call_function("account-scoring", request_data)
                 if "error" in result:
                     error_type = result.get("error_type", "unknown")
                     if error_type == "not_deployed":

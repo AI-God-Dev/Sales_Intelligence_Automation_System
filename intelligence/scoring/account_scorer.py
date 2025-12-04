@@ -378,8 +378,12 @@ Respond in JSON format:
         
         return "\n".join(prompt_parts)
     
-    def score_all_accounts(self) -> int:
-        """Score all active accounts. Returns count of accounts scored.
+    def score_all_accounts(self, limit: Optional[int] = None) -> int:
+        """Score active accounts. Returns count of accounts scored.
+        
+        Args:
+            limit: Optional limit on number of accounts to score (for testing).
+                  If None, scores all accounts.
         
         Memory-optimized: Processes accounts one at a time and inserts immediately
         to prevent memory overflow.
@@ -403,14 +407,21 @@ Respond in JSON format:
             logger.warning("No accounts found to score")
             return 0
         
-        logger.info(f"Scoring {total_accounts} accounts (processing one at a time to save memory)")
+        # Apply limit if specified
+        max_accounts = limit if limit is not None and limit > 0 else total_accounts
+        accounts_to_score = min(max_accounts, total_accounts)
+        
+        if limit:
+            logger.info(f"Scoring {accounts_to_score} accounts (limited from {total_accounts} total)")
+        else:
+            logger.info(f"Scoring {accounts_to_score} accounts (processing one at a time to save memory)")
         
         scored_count = 0
         failed_count = 0
         offset = 0
         chunk_size = 50  # Fetch 50 account IDs at a time from BigQuery
         
-        while offset < total_accounts:
+        while offset < accounts_to_score:
             # Fetch a chunk of account IDs
             query = f"""
             SELECT DISTINCT account_id

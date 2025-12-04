@@ -17,15 +17,35 @@ logger = setup_logger(__name__)
 def account_scoring_job(request):
     """
     HTTP Cloud Function/Cloud Run entry point for daily account scoring.
+    
+    Request body (optional):
+    {
+        "limit": 10  # Optional: limit number of accounts to score (for testing)
+    }
     """
     try:
         started_at = datetime.now(timezone.utc).isoformat()
         logger.info("Starting daily account scoring job")
         
+        # Parse request body for optional limit parameter
+        request_json = request.get_json(silent=True) or {}
+        limit = request_json.get("limit")
+        if limit is not None:
+            try:
+                limit = int(limit)
+                if limit <= 0:
+                    limit = None
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid limit value: {limit}, ignoring")
+                limit = None
+        
+        if limit:
+            logger.info(f"Processing with limit: {limit} accounts")
+        
         bq_client = BigQueryClient()
         scorer = AccountScorer(bq_client)
         
-        scored_count = scorer.score_all_accounts()
+        scored_count = scorer.score_all_accounts(limit=limit)
         
         completed_at = datetime.now(timezone.utc).isoformat()
         status = "success" if scored_count > 0 else "failed"
