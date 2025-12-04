@@ -641,7 +641,11 @@ def call_function(function_name: str, data: Dict = None, method: str = "POST") -
         except Exception as auth_error:
             auth_lib_error = auth_error
             import logging
-            logging.warning(f"ID token fetch failed: {str(auth_error)}")
+            error_msg = str(auth_error)
+            logging.warning(f"ID token fetch failed: {error_msg}")
+            # Check if it's the specific ADC error
+            if "Neither metadata server or valid service account credentials are found" in error_msg:
+                logging.info("ADC not available, will use gcloud fallback method")
             # Will try gcloud command fallback
             pass
         
@@ -770,10 +774,25 @@ def call_function(function_name: str, data: Dict = None, method: str = "POST") -
                 "suggestion": "The Cloud Run service may be starting up or experiencing issues. Please wait a few moments and try again. If the problem persists, check the Cloud Run service status in GCP Console or ask Anand to verify the service is running."
             }
         
+        # Provide specific help based on the error
+        suggestion = "All authentication methods failed. Please try one of the following:\n\n"
+        
+        if auth_lib_error and "Neither metadata server or valid service account credentials are found" in str(auth_lib_error):
+            suggestion += "**Quick Fix**: Run this command in your terminal:\n"
+            suggestion += "```bash\ngcloud auth application-default login\n```\n\n"
+            suggestion += "This will set up Application Default Credentials for local development.\n\n"
+        
+        suggestion += "**Alternative Options**:\n"
+        suggestion += "1. Ensure you're logged in: `gcloud auth login`\n"
+        suggestion += "2. Set the project: `gcloud config set project maharani-sales-hub-11-2025`\n"
+        suggestion += "3. Set Application Default Credentials: `gcloud auth application-default login`\n"
+        suggestion += "4. Verify you have run.invoker permission (ask Anand if needed)\n\n"
+        suggestion += "**Note**: The gcloud fallback method should work if gcloud is installed and you're logged in."
+        
         return {
             "error": error_msg,
             "error_type": "auth_error",
-            "suggestion": f"All authentication methods failed. Please ensure:\n1. You're logged in with: gcloud auth login\n2. Project is set: gcloud config set project maharani-sales-hub-11-2025\n3. Application Default Credentials are set: gcloud auth application-default login\n4. You have run.invoker permission on the Cloud Run service (ask Anand if needed).\n\nIf you see a 503 error, the service may be starting up - wait a moment and try again."
+            "suggestion": suggestion
         }
     except HTTPError as e:
         if e.response.status_code == 404:
@@ -1432,7 +1451,30 @@ elif page == "Natural Language Query":
                 result = call_function("nlp-query", {"query": query})
                 
                 if "error" in result:
-                    st.error(f"Error: {result['error']}")
+                    error_type = result.get("error_type", "unknown")
+                    st.error(f"❌ Error: {result['error']}")
+                    
+                    if "suggestion" in result:
+                        with st.expander("💡 How to Fix This", expanded=True):
+                            st.markdown(result['suggestion'])
+                    
+                    if error_type == "auth_error":
+                        st.info("""
+                        **Quick Fix**: Open a terminal and run:
+                        ```bash
+                        gcloud auth application-default login
+                        ```
+                        Then refresh this page and try again.
+                        """)
+                    elif error_type == "not_deployed":
+                        st.warning("""
+                        **Function Not Deployed**: The `nlp-query` function needs to be deployed first.
+                        
+                        Ask Anand to deploy it using:
+                        ```bash
+                        .\scripts\deploy_phase2_functions.ps1
+                        ```
+                        """)
                 else:
                     st.success("Query executed successfully!")
                     
