@@ -1142,15 +1142,19 @@ __file__: {__file__}
                     with st.expander("How to deploy Cloud Functions"):
                         st.code("""
 # Deploy Phase 2 Functions including account-scoring:
-./scripts/deploy_phase2_functions.sh
+./scripts/deploy_phase2_functions.ps1
 
 # Or deploy individually:
-gcloud functions deploy account-scoring \\
-  --gen2 --runtime=python311 --region=us-central1 \\
-  --source=./intelligence/scoring \\
-  --entry-point=account_scoring \\
-  --trigger-http \\
-  --service-account=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com \\
+gcloud functions deploy account-scoring `
+  --gen2 --runtime=python311 --region=us-central1 `
+  --source=. `
+  --entry-point=account_scoring_job `
+  --trigger-http `
+  --no-allow-unauthenticated `
+  --service-account=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com `
+  --memory=2048MB `
+  --timeout=540s `
+  --set-env-vars="GCP_PROJECT_ID=maharani-sales-hub-11-2025,GCP_REGION=us-central1,LLM_PROVIDER=vertex_ai" `
   --project=maharani-sales-hub-11-2025
                         """, language="bash")
                     if "suggestion" in result:
@@ -1176,7 +1180,10 @@ gcloud functions deploy account-scoring \\
                 FROM `{PROJECT_ID}.sales_intelligence.account_recommendations` r
                 JOIN `{PROJECT_ID}.sales_intelligence.sf_accounts` a
                     ON r.account_id = a.account_id
-                WHERE r.score_date = CURRENT_DATE()
+                WHERE r.score_date = (
+                    SELECT MAX(score_date) 
+                    FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                )
                 ORDER BY r.priority_score DESC
                 LIMIT 20
                 """
@@ -1218,6 +1225,47 @@ elif page == "Account Scoring":
     - **Activity Level** - Overall account activity and touchpoints
     """)
     
+    # Refresh button at top
+    col_refresh1, col_refresh2, col_refresh3 = st.columns([1, 1, 3])
+    with col_refresh1:
+        if st.button("🔄 Refresh Account Scores", type="primary"):
+            with st.spinner("Refreshing account scores... This may take a few minutes."):
+                result = call_function("account-scoring", {})
+                if "error" in result:
+                    error_type = result.get("error_type", "unknown")
+                    if error_type == "not_deployed":
+                        st.warning(f"⚠️ {result['error']}")
+                        with st.expander("How to deploy Cloud Functions"):
+                            st.code("""
+# Deploy Phase 2 Functions including account-scoring:
+.\scripts\deploy_phase2_functions.ps1
+
+# Or deploy individually:
+gcloud functions deploy account-scoring `
+  --gen2 --runtime=python311 --region=us-central1 `
+  --source=. `
+  --entry-point=account_scoring_job `
+  --trigger-http `
+  --no-allow-unauthenticated `
+  --service-account=sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com `
+  --memory=2048MB `
+  --timeout=540s `
+  --set-env-vars="GCP_PROJECT_ID=maharani-sales-hub-11-2025,GCP_REGION=us-central1,LLM_PROVIDER=vertex_ai" `
+  --project=maharani-sales-hub-11-2025
+                            """, language="bash")
+                        if "suggestion" in result:
+                            st.info(f"💡 {result['suggestion']}")
+                    elif error_type == "service_unavailable":
+                        st.warning(f"⚠️ {result['error']}")
+                        if "suggestion" in result:
+                            st.info(f"💡 {result['suggestion']}")
+                    else:
+                        st.error(f"❌ {result.get('error', 'Unknown error occurred')}")
+                else:
+                    accounts_scored = result.get('accounts_scored', 0)
+                    st.success(f"✅ Successfully scored {accounts_scored} accounts!")
+                    st.rerun()
+    
     if st.session_state.bq_client:
         # Score distribution
         col1, col2 = st.columns(2)
@@ -1234,7 +1282,10 @@ elif page == "Account Scoring":
                     END as score_range,
                     COUNT(*) as count
                 FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
-                WHERE score_date = CURRENT_DATE()
+                WHERE score_date = (
+                    SELECT MAX(score_date) 
+                    FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                )
                 GROUP BY score_range
                 ORDER BY score_range
                 """
@@ -1265,7 +1316,10 @@ elif page == "Account Scoring":
                     END as likelihood_range,
                     COUNT(*) as count
                 FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
-                WHERE score_date = CURRENT_DATE()
+                WHERE score_date = (
+                    SELECT MAX(score_date) 
+                    FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                )
                 GROUP BY likelihood_range
                 ORDER BY likelihood_range
                 """
@@ -1287,6 +1341,7 @@ elif page == "Account Scoring":
         # Account list
         st.subheader("All Account Scores")
         try:
+            # Try today first, then fall back to most recent
             all_scores_query = f"""
             SELECT 
                 a.account_name,
@@ -1296,21 +1351,47 @@ elif page == "Account Scoring":
                 r.reasoning,
                 r.recommended_action,
                 r.key_signals,
-                r.last_interaction_date
+                r.last_interaction_date,
+                r.score_date
             FROM `{PROJECT_ID}.sales_intelligence.account_recommendations` r
             JOIN `{PROJECT_ID}.sales_intelligence.sf_accounts` a
                 ON r.account_id = a.account_id
-            WHERE r.score_date = CURRENT_DATE()
+            WHERE r.score_date = (
+                SELECT MAX(score_date) 
+                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+            )
             ORDER BY r.priority_score DESC
+            LIMIT 100
             """
             all_scores = query_bigquery(all_scores_query, max_results=100)
-            if all_scores:
+            if all_scores and len(all_scores) > 0:
                 df = pd.DataFrame(all_scores)
-                st.dataframe(df, use_container_width=True)
+                # Show score date info
+                if 'score_date' in df.columns and not df.empty:
+                    latest_date = df['score_date'].iloc[0] if len(df) > 0 else None
+                    if latest_date:
+                        st.caption(f"📅 Showing scores from: {latest_date}")
+                # Remove score_date from display
+                if 'score_date' in df.columns:
+                    df_display = df.drop(columns=['score_date'])
+                else:
+                    df_display = df
+                st.dataframe(df_display, use_container_width=True, height=400)
             else:
-                st.info("No scores available. Run account scoring first.")
+                st.info("""
+                ℹ️ **No scores available yet.**
+                
+                Click the "🔄 Refresh Account Scores" button above to generate scores for all accounts.
+                This process may take several minutes depending on the number of accounts.
+                """)
         except Exception as e:
-            st.error(f"Error loading scores: {str(e)}")
+            error_msg = str(e)
+            st.error(f"❌ Error loading scores: {error_msg}")
+            if "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
+                st.info("💡 The account_recommendations table may not exist yet. Run account scoring first.")
+            else:
+                with st.expander("🔍 Error Details"):
+                    st.code(error_msg)
 
 # Natural Language Query Page
 elif page == "Natural Language Query":

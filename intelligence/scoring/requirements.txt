@@ -2,3 +2,4 @@ functions-framework>=3.5.0
 google-cloud-bigquery>=3.13.0
 anthropic>=0.18.0
 google-cloud-aiplatform[vertex-ai]>=1.54.0
+python-dateutil>=2.8.2

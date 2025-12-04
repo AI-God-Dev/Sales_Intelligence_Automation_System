@@ -1,5 +1,7 @@
 # Deploy Account Scoring Function
 
+> **📖 For complete setup guide, see [ACCOUNT_SCORING_COMPLETE_GUIDE.md](./ACCOUNT_SCORING_COMPLETE_GUIDE.md)**
+
 ## Issue
 The function deployment is blocked by IAM permission: `run.services.setIamPolicy`
 

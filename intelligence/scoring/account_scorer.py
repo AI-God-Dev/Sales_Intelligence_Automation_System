@@ -178,8 +178,12 @@ class AccountScorer:
         WHERE account_id = @account_id
         """
         
-        account_info = self.bq_client.query(account_query, job_config=job_config)
-        account_data = account_info[0] if account_info else {}
+        try:
+            account_info = self.bq_client.query(account_query, job_config=job_config)
+            account_data = account_info[0] if account_info and len(account_info) > 0 else {}
+        except Exception as e:
+            logger.warning(f"Failed to get account info for {account_id}: {e}")
+            account_data = {}
         
         return {
             "account_id": account_id,
@@ -228,26 +232,74 @@ Respond in JSON format:
             # Extract JSON from response
             json_match = re.search(r'\{[\s\S]*\}', response)
             if json_match:
-                score_data = json.loads(json_match.group())
+                try:
+                    score_data = json.loads(json_match.group())
+                    # Validate and sanitize score data
+                    score_data = {
+                        "priority_score": max(0, min(100, int(score_data.get("priority_score", 50)))),
+                        "budget_likelihood": max(0, min(100, int(score_data.get("budget_likelihood", 50)))),
+                        "engagement_score": max(0, min(100, int(score_data.get("engagement_score", 50)))),
+                        "reasoning": str(score_data.get("reasoning", ""))[:1000],  # Limit length
+                        "recommended_action": str(score_data.get("recommended_action", ""))[:500],  # Limit length
+                        "key_signals": list(score_data.get("key_signals", []))[:20]  # Limit to 20 signals
+                    }
+                except (json.JSONDecodeError, ValueError, TypeError) as e:
+                    logger.warning(f"Could not parse or validate JSON from LLM response: {e}. Response: {response[:500]}")
+                    score_data = {
+                        "priority_score": 50,
+                        "budget_likelihood": 50,
+                        "engagement_score": 50,
+                        "reasoning": f"Unable to parse LLM response: {str(e)[:200]}",
+                        "recommended_action": "Review account manually",
+                        "key_signals": []
+                    }
             else:
                 # Fallback if no JSON found
-                logger.warning(f"Could not parse JSON from LLM response: {response}")
+                logger.warning(f"Could not find JSON in LLM response: {response[:500]}")
                 score_data = {
                     "priority_score": 50,
                     "budget_likelihood": 50,
                     "engagement_score": 50,
-                    "reasoning": "Unable to parse LLM response",
+                    "reasoning": "Unable to parse LLM response - no JSON found",
                     "recommended_action": "Review account manually",
                     "key_signals": []
                 }
             
             # Determine last interaction date
             last_interaction = None
-            if account_data.get("emails"):
-                last_interaction = account_data["emails"][0].get("sent_at")
-            if account_data.get("calls"):
+            
+            # Helper function to parse date/datetime
+            def parse_datetime(value):
+                """Parse datetime from various formats."""
+                if value is None:
+                    return None
+                if isinstance(value, datetime):
+                    return value
+                if isinstance(value, str):
+                    try:
+                        from dateutil import parser
+                        return parser.parse(value)
+                    except:
+                        try:
+                            # Try ISO format
+                            return datetime.fromisoformat(value.replace('Z', '+00:00'))
+                        except:
+                            logger.warning(f"Could not parse datetime: {value}")
+                            return None
+                return None
+            
+            # Check emails (list of dicts from BigQuery)
+            if account_data.get("emails") and len(account_data["emails"]) > 0:
+                email_date = account_data["emails"][0].get("sent_at")
+                email_date = parse_datetime(email_date)
+                if email_date and (not last_interaction or email_date > last_interaction):
+                    last_interaction = email_date
+            
+            # Check calls (list of dicts from BigQuery)
+            if account_data.get("calls") and len(account_data["calls"]) > 0:
                 call_time = account_data["calls"][0].get("call_time")
-                if not last_interaction or (call_time and call_time > last_interaction):
+                call_time = parse_datetime(call_time)
+                if call_time and (not last_interaction or call_time > last_interaction):
                     last_interaction = call_time
             
             return {
@@ -260,7 +312,7 @@ Respond in JSON format:
                 "reasoning": score_data.get("reasoning", ""),
                 "recommended_action": score_data.get("recommended_action", ""),
                 "key_signals": score_data.get("key_signals", []),
-                "last_interaction_date": last_interaction.date().isoformat() if last_interaction else None,
+                "last_interaction_date": last_interaction.date().isoformat() if last_interaction and hasattr(last_interaction, 'date') else (last_interaction.isoformat()[:10] if last_interaction else None),
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
         except Exception as e:
@@ -340,11 +392,21 @@ Respond in JSON format:
         FROM `{self.bq_client.project_id}.{self.bq_client.dataset_id}.sf_accounts`
         WHERE account_id IS NOT NULL
         """
-        count_result = self.bq_client.query(count_query)
-        total_accounts = count_result[0]["total"] if count_result else 0
+        try:
+            count_result = self.bq_client.query(count_query)
+            total_accounts = count_result[0]["total"] if count_result and len(count_result) > 0 else 0
+        except Exception as e:
+            logger.error(f"Failed to get account count: {e}")
+            raise ValueError(f"Cannot determine account count: {e}")
+        
+        if total_accounts == 0:
+            logger.warning("No accounts found to score")
+            return 0
+        
         logger.info(f"Scoring {total_accounts} accounts (processing one at a time to save memory)")
         
         scored_count = 0
+        failed_count = 0
         offset = 0
         chunk_size = 50  # Fetch 50 account IDs at a time from BigQuery
         
@@ -359,12 +421,27 @@ Respond in JSON format:
             OFFSET {offset}
             """
             
-            accounts_chunk = self.bq_client.query(query)
+            try:
+                accounts_chunk = self.bq_client.query(query)
+            except Exception as e:
+                logger.error(f"Failed to fetch account chunk (offset {offset}): {e}")
+                failed_count += chunk_size
+                offset += chunk_size
+                continue
+            
+            if not accounts_chunk or len(accounts_chunk) == 0:
+                logger.info(f"No more accounts to process at offset {offset}")
+                break
             
             # Process each account one at a time and insert immediately
             for account in accounts_chunk:
                 try:
-                    account_id = account["account_id"]
+                    account_id = account.get("account_id")
+                    if not account_id:
+                        logger.warning(f"Skipping account with no account_id: {account}")
+                        failed_count += 1
+                        continue
+                    
                     recommendation = self.score_account(account_id)
                     
                     # Insert immediately (one at a time) to free memory
@@ -374,17 +451,23 @@ Respond in JSON format:
                     # Force garbage collection every 5 accounts
                     if scored_count % 5 == 0:
                         gc.collect()
-                        logger.info(f"Processed {scored_count}/{total_accounts} accounts")
+                        logger.info(f"Processed {scored_count}/{total_accounts} accounts (failed: {failed_count})")
                     
                 except Exception as e:
-                    logger.error(f"Failed to score account {account.get('account_id')}: {e}")
+                    failed_count += 1
+                    account_id = account.get('account_id', 'unknown')
+                    logger.error(f"Failed to score account {account_id}: {e}", exc_info=True)
                     # Continue with next account even if one fails
             
             offset += chunk_size
             # Force garbage collection after each chunk
             gc.collect()
         
-        logger.info(f"Completed scoring {scored_count} accounts")
+        logger.info(f"Completed scoring {scored_count} accounts (failed: {failed_count}, total: {total_accounts})")
+        
+        if scored_count == 0 and total_accounts > 0:
+            raise ValueError(f"Failed to score any accounts. {failed_count} failures out of {total_accounts} total accounts.")
+        
         return scored_count
 
 
