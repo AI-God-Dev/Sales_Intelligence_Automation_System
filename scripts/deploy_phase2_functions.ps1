@@ -161,7 +161,7 @@ gcloud functions deploy semantic-search `
 
 # Grant Cloud Scheduler permission to invoke functions
 Write-Host "Granting Cloud Scheduler permission to invoke functions..." -ForegroundColor Yellow
-$functions = @("generate-embeddings", "account-scoring", "create-leads", "enroll-hubspot", "get-hubspot-sequences", "generate-email-reply", "semantic-search")
+$functions = @("generate-embeddings", "account-scoring", "nlp-query", "create-leads", "enroll-hubspot", "get-hubspot-sequences", "generate-email-reply", "semantic-search")
 foreach ($func in $functions) {
     try {
         gcloud functions add-iam-policy-binding $func `
