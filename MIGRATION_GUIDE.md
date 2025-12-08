@@ -246,8 +246,8 @@ export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 **Error**: `Unsupported provider: xyz`
 
 **Solution**: Check environment variable spelling and supported providers:
-- LLM: `vertex_ai`, `openai`, `anthropic`, `mock`
-- Embeddings: `vertex_ai`, `openai`, `local`, `mock`
+- LLM: `vertex_ai`, `mock` (Vertex-only in production)
+- Embeddings: `vertex_ai`, `local`, `mock` (Vertex-only in production)
 
 ---
 

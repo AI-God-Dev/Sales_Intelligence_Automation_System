@@ -114,8 +114,7 @@ Required secrets:
 - `salesforce-refresh-token` (optional, if using OAuth flow)
 - `dialpad-api-key`
 - `hubspot-api-key` (Private App access token)
-- `openai-api-key` (optional)
-- `anthropic-api-key` (optional)
+- Vertex-only: no OpenAI/Anthropic secrets required (ADC)
 
 ## Service Account Permissions
 

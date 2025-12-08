@@ -131,8 +131,7 @@ echo -n "[value]" | gcloud secrets create salesforce-password --data-file=-
 echo -n "[value]" | gcloud secrets create salesforce-security-token --data-file=-
 echo -n "[value]" | gcloud secrets create dialpad-api-key --data-file=-
 echo -n "[value]" | gcloud secrets create hubspot-api-key --data-file=-
-echo -n "[value]" | gcloud secrets create openai-api-key --data-file=-
-echo -n "[value]" | gcloud secrets create anthropic-api-key --data-file=-
+# Vertex-only: no OpenAI/Anthropic secrets required
 
 # Grant service account access to secrets
 gcloud secrets add-iam-policy-binding salesforce-username \

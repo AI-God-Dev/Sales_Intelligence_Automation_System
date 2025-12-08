@@ -147,8 +147,7 @@ echo -n "YOUR_DIALPAD_API_KEY" | gcloud secrets versions add dialpad-api-key --d
 echo -n "YOUR_HUBSPOT_API_KEY" | gcloud secrets versions add hubspot-api-key --data-file=- --project="$PROJECT_ID"
 
 # LLM Providers
-echo -n "YOUR_OPENAI_KEY" | gcloud secrets versions add openai-api-key --data-file=- --project="$PROJECT_ID"
-echo -n "YOUR_ANTHROPIC_KEY" | gcloud secrets versions add anthropic-api-key --data-file=- --project="$PROJECT_ID"
+# Vertex-only: no OpenAI/Anthropic secrets needed
 ```
 
 ## Security Best Practices
