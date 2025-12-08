@@ -63,7 +63,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                  EXTERNAL SYSTEMS                                │
-│  Gmail │ Salesforce │ Dialpad │ HubSpot │ Vertex AI │ OpenAI   │
+│  Gmail │ Salesforce │ Dialpad │ HubSpot │ Vertex AI │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -239,7 +239,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 **Location**: `ai/` directory
 
 **Components**:
-- `ai/models.py`: LLM provider abstraction (Vertex AI, OpenAI, Anthropic, Mock)
+- `ai/models.py`: LLM provider abstraction (Vertex AI only, with Mock mode for testing)
 - `ai/embeddings.py`: Embedding provider abstraction
 - `ai/semantic_search.py`: Semantic search provider
 - `ai/scoring.py`: Account scoring provider
@@ -263,8 +263,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 - HubSpot sequence content
 
 **Models**:
-- Vertex AI: `textembedding-gecko@001` (768 dimensions)
-- OpenAI: `text-embedding-3-small` (1536) or `text-embedding-3-large` (3072)
+- Vertex AI: `textembedding-gecko@001` (768 dimensions) - THE ONLY PERMITTED EMBEDDING MODEL
 
 **Storage**:
 - Primary: `gmail_messages.embedding`, `dialpad_calls.embedding`
@@ -409,8 +408,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 - Salesforce OAuth credentials
 - Dialpad API key
 - HubSpot API key
-- OpenAI API key (optional)
-- Anthropic API key (optional)
+- Note: Vertex AI uses Application Default Credentials (ADC) - no API keys needed
 
 ### 5.4 IAM Roles
 

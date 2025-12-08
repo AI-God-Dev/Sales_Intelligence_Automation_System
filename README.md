@@ -44,7 +44,7 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
  └─────────────────────────────────────────────┘
         │
         ▼
- [Vector Search + LLM (Vertex AI / OpenAI)]
+ [Vector Search + LLM (Vertex AI)]
         │
         ▼
  [Web App – Query + Lead Dashboard + Actions]
@@ -54,8 +54,8 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 
 - **Data Warehouse**: Google BigQuery
 - **ETL/Ingestion**: Google Cloud Functions + Cloud Scheduler (Python 3.11)
-- **LLM Provider**: Anthropic Claude API or Google Vertex AI
-- **Embeddings**: OpenAI text-embedding-3-small or Vertex AI
+- **LLM Provider**: Google Vertex AI (Gemini models)
+- **Embeddings**: Vertex AI textembedding-gecko@001
 - **Vector Search**: BigQuery Vector Search
 - **Web Application**: Streamlit or Next.js
 - **Hosting**: Google Cloud Run
@@ -191,7 +191,7 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
    - Gmail OAuth credentials (for mailboxes)
    - Dialpad API key
    - HubSpot API credentials
-   - LLM provider API key (Anthropic/OpenAI/Vertex AI)
+   - GCP Project ID (Vertex AI uses Application Default Credentials - no API keys needed)
 
 2. **Infrastructure Setup**:
    - GCP APIs enabled

@@ -1,7 +1,7 @@
 """
 Unified AI Model Abstraction Layer
 Provides a single interface for all AI operations across the system.
-Supports OpenAI, Vertex AI, and local/mock modes.
+Uses Vertex AI only (with local/mock modes for testing).
 """
 from ai.models import ModelProvider, get_model_provider
 from ai.embeddings import EmbeddingProvider, get_embedding_provider

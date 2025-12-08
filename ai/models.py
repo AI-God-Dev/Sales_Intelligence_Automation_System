@@ -1,6 +1,6 @@
 """
 Unified Model Provider Interface
-Abstracts LLM calls across OpenAI, Vertex AI, Anthropic, and mock modes.
+Abstracts LLM calls using Vertex AI only (with mock mode for testing).
 """
 import os
 import logging
@@ -14,22 +14,11 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
 warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
 
-# Conditional imports
-try:
-    import openai
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-
-try:
-    import anthropic
-    ANTHROPIC_AVAILABLE = True
-except ImportError:
-    ANTHROPIC_AVAILABLE = False
-
+# Vertex AI imports
 try:
     from google.cloud import aiplatform
     from vertexai.generative_models import GenerativeModel
+    from vertexai import init as vertex_init
     VERTEX_AI_AVAILABLE = True
 except ImportError:
     VERTEX_AI_AVAILABLE = False
@@ -50,25 +39,36 @@ class ModelProvider(ABC):
 
 
 class MockModelProvider(ModelProvider):
-    """Mock model provider for testing and local development."""
+    """Mock model provider for testing and local development.
+    
+    Simulates Vertex AI Gemini behavior for MOCK_MODE.
+    Returns deterministic responses based on prompt content.
+    """
     
     def generate(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
-        """Return mock response."""
-        if "score" in prompt.lower() or "scoring" in prompt.lower():
+        """Return mock response simulating Vertex AI Gemini output."""
+        # Simulate Vertex AI JSON output for scoring
+        if "score" in prompt.lower() or "scoring" in prompt.lower() or "priority_score" in prompt.lower():
             return """{
   "priority_score": 75,
   "budget_likelihood": 60,
   "engagement_score": 80,
-  "reasoning": "Mock reasoning: Account shows moderate engagement with recent email activity.",
+  "reasoning": "Mock reasoning: Account shows moderate engagement with recent email activity. Simulated Vertex AI Gemini response.",
   "recommended_action": "Follow up with pricing discussion",
   "key_signals": ["Recent email exchange", "Budget discussion mentioned"]
 }"""
-        elif "summary" in prompt.lower():
-            return "Mock summary: This is a placeholder summary generated in MOCK_MODE."
-        elif "insight" in prompt.lower():
-            return "Mock insight: Account shows positive engagement signals."
+        # Simulate Vertex AI summary output
+        elif "summary" in prompt.lower() or "summarize" in prompt.lower():
+            return "Mock summary: This is a placeholder summary generated in MOCK_MODE, simulating Vertex AI Gemini output."
+        # Simulate Vertex AI insight output
+        elif "insight" in prompt.lower() or "analyze" in prompt.lower():
+            return "Mock insight: Account shows positive engagement signals. Simulated Vertex AI Gemini analysis."
+        # Simulate Vertex AI SQL generation
+        elif "sql" in prompt.lower() or "query" in prompt.lower() or "SELECT" in prompt.upper():
+            return "SELECT * FROM `{project_id}.{dataset_id}.gmail_messages` LIMIT 10"
+        # Default mock response
         else:
-            return "Mock response: This is a placeholder response generated in MOCK_MODE."
+            return "Mock response: This is a placeholder response generated in MOCK_MODE, simulating Vertex AI Gemini behavior."
     
     def generate_stream(self, prompt: str, system_prompt: str = "", **kwargs):
         """Return mock stream."""
@@ -78,9 +78,9 @@ class MockModelProvider(ModelProvider):
 
 
 class VertexAIModelProvider(ModelProvider):
-    """Vertex AI (Gemini) model provider."""
+    """Vertex AI (Gemini) model provider - THE ONLY PERMITTED AI ENGINE."""
     
-    def __init__(self, project_id: str, region: str, model_name: str = "gemini-pro"):
+    def __init__(self, project_id: str, region: str, model_name: str = "gemini-1.5-pro"):
         if not VERTEX_AI_AVAILABLE:
             raise ImportError("vertexai package not installed. Install with: pip install google-cloud-aiplatform")
         
@@ -88,26 +88,42 @@ class VertexAIModelProvider(ModelProvider):
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=UserWarning)
                 warnings.filterwarnings("ignore", message=".*pkg_resources.*")
+                # Initialize Vertex AI with Application Default Credentials (ADC)
+                vertex_init(project=project_id, location=region)
                 aiplatform.init(project=project_id, location=region)
             
             self.model = GenerativeModel(model_name)
             self.model_name = model_name
+            self.project_id = project_id
+            self.region = region
         except Exception as e:
             logger.error(f"Failed to initialize Vertex AI: {e}")
             raise ValueError(f"Vertex AI initialization failed: {e}")
     
     def generate(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
-        """Generate text using Vertex AI."""
+        """Generate text using Vertex AI Gemini models."""
         try:
+            # Combine system prompt and user prompt
             full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
             
-            # Handle max_tokens if provided
-            generation_config = {}
-            if "max_tokens" in kwargs:
-                generation_config["max_output_tokens"] = kwargs["max_tokens"]
-            if "temperature" in kwargs:
-                generation_config["temperature"] = kwargs["temperature"]
+            # Handle generation config
+            from vertexai.generative_models import GenerationConfig
+            generation_config = None
             
+            config_params = {}
+            if "max_tokens" in kwargs:
+                config_params["max_output_tokens"] = kwargs["max_tokens"]
+            if "temperature" in kwargs:
+                config_params["temperature"] = kwargs.get("temperature", 0.7)
+            
+            # Handle response_schema for structured JSON output (Gemini feature)
+            if "response_schema" in kwargs:
+                config_params["response_schema"] = kwargs["response_schema"]
+            
+            if config_params:
+                generation_config = GenerationConfig(**config_params)
+            
+            # Generate content
             if generation_config:
                 response = self.model.generate_content(
                     full_prompt,
@@ -120,7 +136,8 @@ class VertexAIModelProvider(ModelProvider):
             if hasattr(response, 'text'):
                 return response.text
             elif hasattr(response, 'candidates') and response.candidates:
-                return response.candidates[0].content.parts[0].text
+                if hasattr(response.candidates[0], 'content') and response.candidates[0].content.parts:
+                    return response.candidates[0].content.parts[0].text
             else:
                 raise ValueError(f"Unexpected Vertex AI response format: {response}")
         except Exception as e:
@@ -143,109 +160,6 @@ class VertexAIModelProvider(ModelProvider):
             raise
 
 
-class OpenAIModelProvider(ModelProvider):
-    """OpenAI model provider."""
-    
-    def __init__(self, api_key: str, model_name: str = "gpt-4"):
-        if not OPENAI_AVAILABLE:
-            raise ImportError("openai package not installed. Install with: pip install openai")
-        
-        if not api_key:
-            raise ValueError("OpenAI API key not provided")
-        
-        self.client = openai.OpenAI(api_key=api_key)
-        self.model_name = model_name
-    
-    def generate(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
-        """Generate text using OpenAI."""
-        try:
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
-            
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                max_tokens=kwargs.get("max_tokens", 2000),
-                temperature=kwargs.get("temperature", 0.7)
-            )
-            
-            return response.choices[0].message.content
-        except Exception as e:
-            logger.error(f"Error calling OpenAI: {e}", exc_info=True)
-            raise
-    
-    def generate_stream(self, prompt: str, system_prompt: str = "", **kwargs):
-        """Generate streaming text using OpenAI."""
-        try:
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
-            
-            stream = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,
-                max_tokens=kwargs.get("max_tokens", 2000),
-                temperature=kwargs.get("temperature", 0.7),
-                stream=True
-            )
-            
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-        except Exception as e:
-            logger.error(f"Error streaming from OpenAI: {e}", exc_info=True)
-            raise
-
-
-class AnthropicModelProvider(ModelProvider):
-    """Anthropic (Claude) model provider."""
-    
-    def __init__(self, api_key: str, model_name: str = "claude-3-5-sonnet-20241022"):
-        if not ANTHROPIC_AVAILABLE:
-            raise ImportError("anthropic package not installed. Install with: pip install anthropic")
-        
-        if not api_key:
-            raise ValueError("Anthropic API key not provided")
-        
-        self.client = anthropic.Anthropic(api_key=api_key)
-        self.model_name = model_name
-    
-    def generate(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
-        """Generate text using Anthropic."""
-        try:
-            response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=kwargs.get("max_tokens", 2000),
-                system=system_prompt if system_prompt else "",
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            
-            return response.content[0].text
-        except Exception as e:
-            logger.error(f"Error calling Anthropic: {e}", exc_info=True)
-            raise
-    
-    def generate_stream(self, prompt: str, system_prompt: str = "", **kwargs):
-        """Generate streaming text using Anthropic."""
-        try:
-            with self.client.messages.stream(
-                model=self.model_name,
-                max_tokens=kwargs.get("max_tokens", 2000),
-                system=system_prompt if system_prompt else "",
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            ) as stream:
-                for text in stream.text_stream:
-                    yield text
-        except Exception as e:
-            logger.error(f"Error streaming from Anthropic: {e}", exc_info=True)
-            raise
 
 
 def get_model_provider(
@@ -253,20 +167,22 @@ def get_model_provider(
     project_id: str = None,
     region: str = None,
     model_name: str = None,
-    api_key: str = None
+    api_key: str = None  # Deprecated - kept for backward compatibility but ignored
 ) -> ModelProvider:
     """
     Factory function to get the appropriate model provider.
     
+    ONLY VERTEX AI IS SUPPORTED. OpenAI and Anthropic have been removed.
+    
     Args:
-        provider: 'vertex_ai', 'openai', 'anthropic', or 'mock'
-        project_id: GCP project ID (required for Vertex AI)
-        region: GCP region (required for Vertex AI)
-        model_name: Model name to use
-        api_key: API key (required for OpenAI/Anthropic)
+        provider: 'vertex_ai' or 'mock' (default: 'vertex_ai')
+        project_id: GCP project ID (required for Vertex AI, uses ADC for auth)
+        region: GCP region (required for Vertex AI, default: 'us-central1')
+        model_name: Model name to use (default: 'gemini-1.5-pro')
+        api_key: DEPRECATED - ignored (Vertex AI uses Application Default Credentials)
     
     Returns:
-        ModelProvider instance
+        ModelProvider instance (VertexAIModelProvider or MockModelProvider)
     """
     # Check for MOCK_MODE first
     mock_mode = os.getenv("MOCK_MODE", "0").strip().lower() in ("1", "true", "yes")
@@ -278,8 +194,13 @@ def get_model_provider(
     if not provider:
         provider = os.getenv("LLM_PROVIDER", "vertex_ai").strip().lower()
     
+    # Force vertex_ai if anything else is specified (except mock)
+    if provider not in ("vertex_ai", "mock"):
+        logger.warning(f"Provider '{provider}' is not supported. Only 'vertex_ai' and 'mock' are allowed. Using 'vertex_ai'.")
+        provider = "vertex_ai"
+    
     if not model_name:
-        model_name = os.getenv("LLM_MODEL", "gemini-pro").strip()
+        model_name = os.getenv("LLM_MODEL", "gemini-1.5-pro").strip()
     
     if provider == "mock":
         return MockModelProvider()
@@ -289,19 +210,7 @@ def get_model_provider(
         if not region:
             region = os.getenv("GCP_REGION", "us-central1").strip()
         if not project_id:
-            raise ValueError("GCP_PROJECT_ID required for Vertex AI provider")
+            raise ValueError("GCP_PROJECT_ID required for Vertex AI provider. Vertex AI uses Application Default Credentials (ADC) for authentication - no API key needed.")
         return VertexAIModelProvider(project_id, region, model_name)
-    elif provider == "openai":
-        if not api_key:
-            api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY required for OpenAI provider")
-        return OpenAIModelProvider(api_key, model_name)
-    elif provider == "anthropic":
-        if not api_key:
-            api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY required for Anthropic provider")
-        return AnthropicModelProvider(api_key, model_name)
     else:
-        raise ValueError(f"Unsupported provider: {provider}. Use 'vertex_ai', 'openai', 'anthropic', or 'mock'")
+        raise ValueError(f"Unsupported provider: {provider}. Only 'vertex_ai' and 'mock' are supported.")

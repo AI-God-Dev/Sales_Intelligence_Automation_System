@@ -23,12 +23,12 @@ class AccountScorer:
     def __init__(self, bq_client: Optional[BigQueryClient] = None, model_provider: Optional[ModelProvider] = None, scoring_provider: Optional[ScoringProvider] = None):
         self.bq_client = bq_client or BigQueryClient()
         # Use provided providers or get from factory (respects MOCK_MODE/LOCAL_MODE)
+        # Vertex AI uses Application Default Credentials - no API key needed
         self.model_provider = model_provider or get_model_provider(
             provider=settings.llm_provider,
             project_id=settings.gcp_project_id,
             region=settings.gcp_region,
-            model_name=settings.llm_model,
-            api_key=getattr(settings, 'anthropic_api_key', None) if settings.llm_provider == 'anthropic' else (getattr(settings, 'openai_api_key', None) if settings.llm_provider == 'openai' else None)
+            model_name=settings.llm_model
         )
         self.scoring_provider = scoring_provider or get_scoring_provider(model_provider=self.model_provider, bq_client=self.bq_client)
     

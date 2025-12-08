@@ -3,9 +3,10 @@
 This directory contains all Phase 2 components: AI-powered intelligence and automation features.
 
 **Note**: All AI components now use the unified abstraction layer in `ai/` directory. This provides:
-- Provider-agnostic code (Vertex AI, OpenAI, Anthropic, Mock)
+- Vertex AI only (OpenAI and Anthropic removed)
 - MOCK_MODE and LOCAL_MODE support for testing
 - Consistent error handling and retry logic
+- Application Default Credentials (ADC) for authentication - no API keys needed
 
 ## Structure
 
@@ -188,10 +189,10 @@ result = generator.generate_reply(
 ## Configuration
 
 All components use the configuration from `config.config`:
-- LLM provider (Anthropic Claude or Vertex AI)
-- Embedding model
+- LLM provider (Vertex AI only - uses Application Default Credentials)
+- Embedding model (Vertex AI textembedding-gecko@001)
 - BigQuery project and dataset
-- API keys from Secret Manager
+- GCP Project ID and Region (for Vertex AI authentication)
 
 ## Deployment
 

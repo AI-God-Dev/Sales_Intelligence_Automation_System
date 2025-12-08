@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AI Intelligence Layer provides semantic search, account scoring, natural language queries, summarization, and insights generation using Large Language Models (LLMs) and vector embeddings. The system uses a **unified abstraction layer** that supports multiple providers and local/mock modes for testing.
+The AI Intelligence Layer provides semantic search, account scoring, natural language queries, summarization, and insights generation using Large Language Models (LLMs) and vector embeddings. The system uses **Vertex AI exclusively** with local/mock modes for testing.
 
 ---
 
@@ -25,30 +25,23 @@ ai/
 
 ### Provider Support
 
-The system supports multiple AI providers:
+**VERTEX AI ONLY** - OpenAI and Anthropic have been completely removed.
 
-1. **Vertex AI** (Recommended - Default)
-   - Models: `gemini-pro`, `text-bison@001`
-   - Embeddings: `textembedding-gecko@001`
-   - No API keys needed (uses GCP service account)
+1. **Vertex AI** (Production - THE ONLY PERMITTED AI ENGINE)
+   - Models: `gemini-1.5-pro` (default), `gemini-1.5-flash` (fast)
+   - Embeddings: `textembedding-gecko@001` (768 dimensions)
+   - Authentication: Application Default Credentials (ADC) - no API keys needed
+   - Uses GCP service account for authentication
 
-2. **OpenAI**
-   - Models: `gpt-4`, `gpt-3.5-turbo`
-   - Embeddings: `text-embedding-3-small`, `text-embedding-3-large`
-   - Requires API key in Secret Manager
-
-3. **Anthropic**
-   - Models: `claude-3-5-sonnet-20241022`
-   - Requires API key in Secret Manager
-
-4. **Mock Mode** (Testing)
+2. **Mock Mode** (Testing)
+   - Simulates Vertex AI Gemini behavior
    - Fake responses for testing without API calls
-   - Deterministic outputs
+   - Deterministic outputs matching Vertex AI response patterns
 
-5. **Local Mode** (Development)
-   - Local embeddings using numpy
-   - SQLite database support
+3. **Local Mode** (Development)
+   - Local embeddings using numpy (768 dimensions to match Vertex AI)
    - No external API calls
+   - Useful for offline development
 
 ---
 
@@ -57,16 +50,16 @@ The system supports multiple AI providers:
 ### Environment Variables
 
 ```bash
-# LLM Provider (vertex_ai, openai, anthropic, mock)
+# LLM Provider (vertex_ai or mock)
 LLM_PROVIDER=vertex_ai
 
-# LLM Model
-LLM_MODEL=gemini-pro
+# LLM Model (Vertex AI Gemini models only)
+LLM_MODEL=gemini-1.5-pro
 
-# Embedding Provider (vertex_ai, openai, local, mock)
+# Embedding Provider (vertex_ai, local, or mock)
 EMBEDDING_PROVIDER=vertex_ai
 
-# Embedding Model
+# Embedding Model (Vertex AI only)
 EMBEDDING_MODEL=textembedding-gecko@001
 
 # Mock Mode (1 = enabled, 0 = disabled)
@@ -74,13 +67,24 @@ MOCK_MODE=0
 
 # Local Mode (1 = enabled, 0 = disabled)
 LOCAL_MODE=0
+
+# GCP Configuration (required for Vertex AI)
+GCP_PROJECT_ID=your-project-id
+GCP_REGION=us-central1
 ```
 
-### Secret Manager
+### Authentication
 
-For OpenAI and Anthropic, store API keys in Secret Manager:
-- `openai-api-key`: OpenAI API key
-- `anthropic-api-key`: Anthropic API key
+**Vertex AI uses Application Default Credentials (ADC)** - no API keys needed!
+
+1. For local development:
+   ```bash
+   gcloud auth application-default login
+   ```
+
+2. For Cloud Functions:
+   - Uses the service account attached to the function
+   - Ensure service account has `roles/aiplatform.user` role
 
 ---
 
@@ -111,10 +115,8 @@ for chunk in provider.generate_stream(prompt="..."):
 ```
 
 **Supported Providers**:
-- `VertexAIModelProvider`: Vertex AI (Gemini)
-- `OpenAIModelProvider`: OpenAI (GPT-4, GPT-3.5)
-- `AnthropicModelProvider`: Anthropic (Claude)
-- `MockModelProvider`: Mock responses for testing
+- `VertexAIModelProvider`: Vertex AI (Gemini) - THE ONLY PRODUCTION PROVIDER
+- `MockModelProvider`: Mock responses for testing (simulates Vertex AI behavior)
 
 ### 2. Embedding Provider (`ai/embeddings.py`)
 
@@ -139,10 +141,9 @@ dimensions = provider.dimensions  # e.g., 768 for Vertex AI
 ```
 
 **Supported Providers**:
-- `VertexAIEmbeddingProvider`: Vertex AI embeddings
-- `OpenAIEmbeddingProvider`: OpenAI embeddings
-- `LocalEmbeddingProvider`: Local numpy-based embeddings
-- `MockEmbeddingProvider`: Mock embeddings for testing
+- `VertexAIEmbeddingProvider`: Vertex AI embeddings (textembedding-gecko@001, 768 dimensions)
+- `LocalEmbeddingProvider`: Local numpy-based embeddings (768 dimensions to match Vertex AI)
+- `MockEmbeddingProvider`: Mock embeddings for testing (simulates Vertex AI behavior)
 
 ### 3. Semantic Search Provider (`ai/semantic_search.py`)
 

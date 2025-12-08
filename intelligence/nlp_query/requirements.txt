@@ -1,6 +1,6 @@
 functions-framework>=3.5.0
 google-cloud-bigquery>=3.13.0
-anthropic>=0.18.0
+# Vertex AI ONLY - OpenAI and Anthropic removed
 # vertexai will automatically pull in the correct google-cloud-aiplatform version
 vertexai>=1.38.0
 

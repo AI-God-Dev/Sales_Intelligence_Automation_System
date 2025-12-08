@@ -11,7 +11,7 @@ services:
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_REGION=${GCP_REGION:-us-central1}
       - BIGQUERY_DATASET=${BIGQUERY_DATASET:-sales_intelligence}
-      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - LLM_PROVIDER=${LLM_PROVIDER:-vertex_ai}
     volumes:
       - .:/app
       - ~/.config/gcloud:/root/.config/gcloud:ro

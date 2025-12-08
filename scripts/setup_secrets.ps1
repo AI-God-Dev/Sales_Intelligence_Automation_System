@@ -28,9 +28,8 @@ $secrets = @(
     "salesforce-refresh-token",
     "salesforce-instance-url",
     "dialpad-api-key",
-    "hubspot-api-key",
-    "openai-api-key",
-    "anthropic-api-key"
+    "hubspot-api-key"
+    # Note: OpenAI and Anthropic API keys removed - Vertex AI uses Application Default Credentials (ADC)
 )
 
 $createdCount = 0

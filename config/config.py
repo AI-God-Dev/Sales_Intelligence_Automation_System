@@ -148,30 +148,19 @@ class Settings(BaseSettings):
                 raise
             raise Exception("HubSpot API key not found in Secret Manager. Please set 'hubspot-api-key' secret.")
     
-    @property
-    def openai_api_key(self) -> str:
-        try:
-            return self.get_secret("openai-api-key")
-        except Exception:
-            return ""  # Optional for Phase 1
-    
-    @property
-    def anthropic_api_key(self) -> str:
-        try:
-            return self.get_secret("anthropic-api-key")
-        except Exception:
-            return ""  # Optional for Phase 1
+    # OpenAI and Anthropic API keys removed - Vertex AI only
+    # Vertex AI uses Application Default Credentials (ADC) - no API keys needed
     
     # Gmail OAuth (handled via OAuth flow, not stored)
     gmail_oauth_client_id: str = os.getenv("GMAIL_OAUTH_CLIENT_ID", "")
     gmail_oauth_client_secret: str = os.getenv("GMAIL_OAUTH_CLIENT_SECRET", "")
     
     # LLM Configuration
-    # Default to Vertex AI (recommended - no API keys needed, uses GCP service account)
-    llm_provider: str = os.getenv("LLM_PROVIDER", "vertex_ai")  # vertex_ai (recommended) or anthropic
-    llm_model: str = os.getenv("LLM_MODEL", "gemini-pro")  # Vertex AI: gemini-pro, text-bison@001 | Anthropic: claude-3-5-sonnet-20241022
-    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "vertex_ai")  # vertex_ai (recommended) or openai
-    embedding_model: str = os.getenv("EMBEDDING_MODEL", "textembedding-gecko@001")  # Vertex AI: textembedding-gecko@001 | OpenAI: text-embedding-3-small
+    # Vertex AI ONLY - uses Application Default Credentials (ADC) for authentication
+    llm_provider: str = os.getenv("LLM_PROVIDER", "vertex_ai")  # Only 'vertex_ai' or 'mock' supported
+    llm_model: str = os.getenv("LLM_MODEL", "gemini-1.5-pro")  # Vertex AI: gemini-1.5-pro, gemini-1.5-flash
+    embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "vertex_ai")  # Only 'vertex_ai', 'local', or 'mock' supported
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "textembedding-gecko@001")  # Vertex AI: textembedding-gecko@001
     
     # Local Testing & Mock Mode Configuration
     # MOCK_MODE: Use fake/mock AI responses (for testing without API calls)

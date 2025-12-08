@@ -19,12 +19,12 @@ class EmbeddingGenerator:
     def __init__(self, bq_client: Optional[BigQueryClient] = None, embedding_provider: Optional[EmbeddingProvider] = None):
         self.bq_client = bq_client or BigQueryClient()
         # Use provided provider or get from factory (respects MOCK_MODE/LOCAL_MODE)
+        # Vertex AI uses Application Default Credentials - no API key needed
         self.embedding_provider = embedding_provider or get_embedding_provider(
             provider=settings.embedding_provider,
             project_id=settings.gcp_project_id,
             region=settings.gcp_region,
-            model_name=settings.embedding_model,
-            api_key=getattr(settings, 'openai_api_key', None) if settings.embedding_provider == 'openai' else None
+            model_name=settings.embedding_model
         )
     
     def generate_embedding(self, text: str) -> List[float]:

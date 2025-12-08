@@ -51,10 +51,12 @@ class LLMScoringProvider(ScoringProvider):
 Return ONLY valid JSON, no additional text."""
         
         try:
+            # Use Vertex AI Gemini's structured JSON output capability
             response = self.model_provider.generate(
                 prompt,
                 system_prompt=system_prompt,
-                max_tokens=2000
+                max_tokens=2000,
+                temperature=0.3  # Lower temperature for more consistent JSON output
             )
             
             # Parse JSON response

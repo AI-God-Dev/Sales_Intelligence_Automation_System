@@ -22,8 +22,7 @@ secrets=(
   "hubspot-client-id"
   "hubspot-client-secret"
   "hubspot-api-key"
-  "openai-api-key"
-  "anthropic-api-key"
+  # Note: OpenAI and Anthropic API keys removed - Vertex AI uses Application Default Credentials (ADC)
 )
 
 for secret in "${secrets[@]}"; do
