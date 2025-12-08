@@ -83,26 +83,124 @@ invoke_function() {
     local response
     local exit_code=0
     
-    # Invoke function with timeout
-    response=$(timeout 600 gcloud functions call "$func_name" \
+    # Check if function requires authentication
+    local auth_required=$(gcloud functions describe "$func_name" \
         --gen2 \
         --region="$REGION" \
         --project="$PROJECT_ID" \
-        --data="$payload" 2>&1) || exit_code=$?
+        --format="value(serviceConfig.invokerConfig.allowedIngress)" 2>/dev/null || echo "ALL_TRAFFIC")
+    
+    # Invoke function with timeout
+    # For gmail-sync, use async invocation since it can take > 5 minutes
+    if [ "$func_name" = "gmail-sync" ]; then
+        print_info "Using async invocation for gmail-sync (can take > 5 minutes)..."
+        local call_output=$(gcloud functions call "$func_name" \
+            --gen2 \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --data="$payload" \
+            --async 2>&1)
+        
+        local operation_id=$(echo "$call_output" | grep -oP 'operations/[^ ]+' | head -1 || echo "")
+        
+        if [ -z "$operation_id" ]; then
+            # Check for errors in the output
+            if echo "$call_output" | grep -qi "403\|Forbidden"; then
+                print_error "Authentication failed (403 Forbidden). Check IAM permissions."
+                echo "  Error: $call_output"
+                return 1
+            elif echo "$call_output" | grep -qi "500\|Internal Server Error"; then
+                print_error "Function returned 500 Internal Server Error"
+                echo "  Error: $call_output"
+                return 1
+            else
+                print_error "Failed to start async operation"
+                echo "  Error: $call_output"
+                return 1
+            fi
+        fi
+        
+        if [ -n "$operation_id" ]; then
+            print_info "Async operation started: $operation_id"
+            print_info "Waiting for completion (checking every 10s, max 10 minutes)..."
+            
+            local max_wait=600
+            local waited=0
+            while [ $waited -lt $max_wait ]; do
+                sleep 10
+                waited=$((waited + 10))
+                local op_status=$(gcloud functions operations describe "$operation_id" \
+                    --gen2 \
+                    --region="$REGION" \
+                    --project="$PROJECT_ID" \
+                    --format="json" 2>/dev/null || echo "{}")
+                
+                local done_status=$(echo "$op_status" | grep -o '"done":\s*true' || echo "")
+                local error_status=$(echo "$op_status" | grep -o '"error"' || echo "")
+                
+                if [ -n "$done_status" ]; then
+                    if [ -n "$error_status" ]; then
+                        print_error "Async operation failed"
+                        echo "  Operation status: $op_status"
+                        exit_code=1
+                    else
+                        print_success "Async operation completed"
+                        response=$(echo "$op_status" | grep -o '"response":\s*"[^"]*"' | head -1 || echo "Operation completed")
+                        exit_code=0
+                    fi
+                    break
+                fi
+                echo "  Still running... (${waited}s / ${max_wait}s)"
+            done
+            
+            if [ $waited -ge $max_wait ]; then
+                print_error "Async operation timed out after ${max_wait}s"
+                exit_code=124
+            fi
+        fi
+    else
+        # For other functions, use regular invocation with longer timeout
+        # Use --timeout flag for gcloud instead of timeout command for better error handling
+        response=$(gcloud functions call "$func_name" \
+            --gen2 \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --data="$payload" \
+            --timeout=600 2>&1) || exit_code=$?
+        
+        # Check for specific error patterns
+        if echo "$response" | grep -qi "403\|Forbidden"; then
+            print_error "Authentication failed (403 Forbidden). Check IAM permissions."
+            echo "  Error: $response"
+            return 1
+        elif echo "$response" | grep -qi "500\|Internal Server Error"; then
+            print_error "Function returned 500 Internal Server Error"
+            echo "  Error: $response"
+            return 1
+        elif echo "$response" | grep -qi "ReadTimeout\|read timeout"; then
+            print_error "Function timed out (read timeout)"
+            echo "  Error: $response"
+            return 1
+        fi
+    fi
     
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
     
-    if [ $exit_code -eq 0 ] || [ -z "$exit_code" ]; then
+    if [ $exit_code -eq 0 ]; then
         print_success "$func_name responded in ${duration}s"
-        echo "  Response: $response"
+        if [ -n "$response" ]; then
+            echo "  Response: $response" | head -20
+        fi
         return 0
     elif [ $exit_code -eq 124 ]; then
         print_error "$func_name timed out after 600 seconds"
         return 1
     else
         print_error "$func_name invocation failed (exit code: $exit_code)"
-        echo "  Error: $response"
+        if [ -n "$response" ]; then
+            echo "  Error: $response" | head -30
+        fi
         return 1
     fi
 }
@@ -110,28 +208,57 @@ invoke_function() {
 # Function to check logs
 check_logs() {
     local func_name=$1
-    print_info "Checking recent logs for $func_name..."
+    local show_errors_only=${2:-false}
     
-    local logs=$(gcloud functions logs read "$func_name" \
-        --gen2 \
-        --region="$REGION" \
+    if [ "$show_errors_only" = "true" ]; then
+        print_info "Checking recent error logs for $func_name..."
+    else
+        print_info "Checking recent logs for $func_name..."
+    fi
+    
+    # Wait a moment for logs to appear
+    sleep 2
+    
+    local logs=$(gcloud logging read \
+        "resource.type=cloud_function AND resource.labels.function_name=$func_name AND resource.labels.region=$REGION" \
         --project="$PROJECT_ID" \
-        --limit=10 2>/dev/null || echo "")
+        --limit=20 \
+        --format="table(timestamp,severity,textPayload,jsonPayload.message)" \
+        2>/dev/null || echo "")
     
-    if [ -n "$logs" ]; then
-        echo "$logs" | head -5
-        echo ""
-        
-        # Check for errors
-        local errors=$(echo "$logs" | grep -iE "error|failed|exception" || true)
-        if [ -n "$errors" ]; then
-            print_warning "Found errors in logs:"
-            echo "$errors" | head -3
+    # Fallback to functions logs read if logging read fails
+    if [ -z "$logs" ] || [ "$logs" = "" ]; then
+        logs=$(gcloud functions logs read "$func_name" \
+            --gen2 \
+            --region="$REGION" \
+            --project="$PROJECT_ID" \
+            --limit=20 2>/dev/null || echo "")
+    fi
+    
+    if [ -n "$logs" ] && [ "$logs" != "" ]; then
+        if [ "$show_errors_only" = "true" ]; then
+            # Show only errors
+            local error_logs=$(echo "$logs" | grep -iE "ERROR|CRITICAL|Exception|Traceback|Failed|error" || true)
+            if [ -n "$error_logs" ]; then
+                echo "$error_logs" | head -15
+            else
+                print_warning "No error logs found (function may have failed before logging)"
+            fi
         else
-            print_success "No errors in recent logs"
+            echo "$logs" | head -10
+            echo ""
+            
+            # Check for errors
+            local errors=$(echo "$logs" | grep -iE "ERROR|CRITICAL|Exception|Traceback|Failed|error" || true)
+            if [ -n "$errors" ]; then
+                print_warning "Found errors in logs:"
+                echo "$errors" | head -5
+            else
+                print_success "No errors in recent logs"
+            fi
         fi
     else
-        print_warning "No logs found (function may not have run yet)"
+        print_warning "No logs found (function may not have run yet or logs are delayed)"
     fi
 }
 
@@ -220,6 +347,19 @@ test_function() {
         return 0
     else
         print_error "$func_name test failed"
+        
+        # Immediately check error logs for debugging
+        echo ""
+        print_info "Checking error logs for debugging..."
+        check_logs "$func_name" "true"
+        
+        # Provide troubleshooting tips
+        echo ""
+        print_warning "Troubleshooting tips:"
+        echo "  1. Check IAM permissions: gcloud functions get-iam-policy $func_name --region=$REGION --project=$PROJECT_ID"
+        echo "  2. View detailed logs: gcloud functions logs read $func_name --gen2 --region=$REGION --project=$PROJECT_ID --limit=50"
+        echo "  3. Check function status: gcloud functions describe $func_name --gen2 --region=$REGION --project=$PROJECT_ID"
+        
         return 1
     fi
 }
