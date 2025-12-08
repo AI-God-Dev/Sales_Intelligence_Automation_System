@@ -2,7 +2,11 @@
 
 AI-driven sales intelligence and outreach system that unifies communication data and automates sales workflows across Salesforce, Gmail, Dialpad, and HubSpot.
 
-> **📖 New Owner?** Start with the **[HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)** for complete handoff information, then follow **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** for setup instructions.
+> **📖 New to this project?** Start with **[README_DEPLOYMENT.md](README_DEPLOYMENT.md)** for complete deployment instructions, or use **[DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)** for a fast-track deployment.
+
+> **🏗️ Architecture & AI System:** See **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** for system design and **[AI_SYSTEM_GUIDE.md](AI_SYSTEM_GUIDE.md)** for AI capabilities.
+
+> **🧪 Testing & Operations:** See **[LOCAL_TESTING_GUIDE.md](LOCAL_TESTING_GUIDE.md)** for local development and **[RUNBOOK_OPERATIONS.md](RUNBOOK_OPERATIONS.md)** for production operations.
 
 ## Project Overview
 
@@ -16,6 +20,8 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 - Comprehensive monitoring and error handling
 
 ### Phase 2: Intelligence & Automation ✅ (Completed - Production Ready)
+- **Unified AI Abstraction Layer** (`ai/` directory) - Provider-agnostic LLM and embedding interfaces
+- **MOCK_MODE & LOCAL_MODE** - Full offline testing capabilities
 - Daily AI-powered account scoring and prioritization
 - Automated lead creation from unmatched emails
 - AI-generated email replies
@@ -81,29 +87,16 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 
 ## 🚀 Quick Start
 
-### For New Users
+### Fast Deployment (4 Steps)
 
-1. **Read the Handoff Document** - Start here: [HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)
-2. **Follow Getting Started Guide** - Complete setup: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
-3. **Use Deployment Checklist** - Step-by-step: [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)
+1. **Set Environment Variables** - Configure your GCP project ID and region
+2. **Setup Service Account** - Run `.\scripts\setup_service_account.ps1`
+3. **Create BigQuery Dataset** - Run `.\scripts\create_bigquery_datasets.ps1`
+4. **Deploy All Functions** - Run `.\scripts\deploy_all.ps1`
 
-### Project Configuration
-- **GCP Project**: `maharani-sales-hub-11-2025`
-- **Service Account**: `sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com`
-- **Region**: `us-central1`
-- **BigQuery Dataset**: `sales_intelligence`
+**📖 Detailed Instructions:** See [README_DEPLOYMENT.md](README_DEPLOYMENT.md) for complete step-by-step guide.
 
-### Essential Setup Steps
-
-1. **Prerequisites** - GCP account, Python 3.11+, `gcloud` CLI, API access
-2. **Enable APIs** - Run `.\enable_apis.ps1`
-3. **Configure Secrets** - Run `.\create_secrets.ps1`
-4. **Setup Gmail DWD** - Follow [COMPLETE_SETUP_GUIDE.md](COMPLETE_SETUP_GUIDE.md)
-5. **Create BigQuery Tables** - Run `.\scripts\setup_bigquery.ps1`
-6. **Deploy Functions** - Run `.\scripts\deploy_functions.ps1`
-7. **Test Everything** - Follow [docs/STEP_BY_STEP_TESTING_GUIDE.md](docs/STEP_BY_STEP_TESTING_GUIDE.md)
-
-**📖 Detailed Instructions:** See [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) and [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)
+**⚡ Quick Reference:** See [DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md) for fast-track deployment.
 
 ## 📊 Project Status
 
@@ -125,22 +118,20 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 - [x] Automated test suite (45 tests, 100% pass rate)
 - [x] Complete documentation
 
-### Phase 2: Intelligence & Automation (Planned - Not Included)
-- [ ] Embeddings generation
-- [ ] Vector search
-- [ ] Daily account scoring
-- [ ] Natural language queries
-- [ ] Lead creation automation
-- [ ] HubSpot enrollment
-- [ ] AI email replies
+### Phase 2: Intelligence & Automation ✅ (Completed - Production Ready)
+- ✅ Embeddings generation
+- ✅ Vector search
+- ✅ Daily account scoring
+- ✅ Natural language queries
+- ✅ Lead creation automation
+- ✅ HubSpot enrollment
+- ✅ AI email replies
 
 ### Phase 3: Application and UAT ✅ (Completed - Production Ready)
 - ✅ Web application development (Streamlit)
 - ✅ Authentication setup (Google OAuth ready)
 - ✅ Complete dashboard and views
 - ✅ Mobile-responsive design
-
-**📖 Complete Status:** See [PROJECT_COMPLETE.md](PROJECT_COMPLETE.md) - All phases complete!
 
 ## Success Criteria
 
@@ -160,17 +151,44 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 - Robust error handling with user-friendly messages
 - Monitoring and observability
 - Complete documentation
+- Unified AI abstraction layer with provider switching
+- MOCK_MODE and LOCAL_MODE for testing
 
-See [PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) for the complete production readiness checklist and [PRODUCTION_REVIEW_SUMMARY.md](docs/PRODUCTION_REVIEW_SUMMARY.md) for review details.
+## Documentation
+
+### Core Documentation
+- **[README_DEPLOYMENT.md](README_DEPLOYMENT.md)** - Complete deployment guide
+- **[DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)** - Fast-track deployment
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
+
+### Architecture & Design
+- **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** - Complete system architecture
+- **[AI_SYSTEM_GUIDE.md](AI_SYSTEM_GUIDE.md)** - AI system usage and configuration
+- **[WEB_APP_GUIDE.md](WEB_APP_GUIDE.md)** - Web application guide
+
+### Operations & Testing
+- **[LOCAL_TESTING_GUIDE.md](LOCAL_TESTING_GUIDE.md)** - Local development and testing
+- **[RUNBOOK_OPERATIONS.md](RUNBOOK_OPERATIONS.md)** - Production operations guide
+- **[NEXT_STEPS.md](NEXT_STEPS.md)** - Development roadmap
+
+### Handoff & Validation
+- **[HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)** - Complete project handoff document
+- **[FINAL_VALIDATION_CHECKLIST.md](FINAL_VALIDATION_CHECKLIST.md)** - Pre-deployment validation checklist
+- **[PROJECT_COMPLETION_SUMMARY.md](PROJECT_COMPLETION_SUMMARY.md)** - Project completion summary
+
+### Additional Resources
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Detailed architecture documentation
+- **[docs/API.md](docs/API.md)** - API reference
+- **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** - Configuration guide
 
 ## Production Requirements
 
 **⚠️ Important**: Before deploying to production, ensure you have:
 
-1. **All Required Credentials** (see [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md)):
+1. **All Required Credentials**:
    - GCP project with billing enabled
    - Salesforce API credentials
-   - Gmail OAuth credentials (for 3 mailboxes)
+   - Gmail OAuth credentials (for mailboxes)
    - Dialpad API key
    - HubSpot API credentials
    - LLM provider API key (Anthropic/OpenAI/Vertex AI)
@@ -186,22 +204,18 @@ See [PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md) for the complete pro
    - Salesforce admin access
    - All users authorized for OAuth
 
-See [DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) for complete requirements.
+See [README_DEPLOYMENT.md](README_DEPLOYMENT.md) for complete deployment instructions.
 
-**⚠️ Important**: Adding credentials is just the first step! See [Getting Started Guide](docs/GETTING_STARTED.md) for the complete 8-step process to go from credentials to a running system.
-
-## 📚 Documentation Quick Links
+## 📚 Documentation
 
 | Document | Purpose |
 |----------|---------|
-| **[START_HERE.md](START_HERE.md)** | Entry point - **Start here!** |
-| **[PROJECT_COMPLETE.md](PROJECT_COMPLETE.md)** | Complete project status (all phases) |
-| **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** | Complete documentation index |
-| **[HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)** | Complete handoff package |
-| **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** | Step-by-step setup guide |
-| **[docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md)** | Deployment checklist |
-| **[docs/guides/RUN_PROJECT.md](docs/guides/RUN_PROJECT.md)** | How to run the project |
-| **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** | Common issues and solutions |
+| **[README_DEPLOYMENT.md](README_DEPLOYMENT.md)** | Complete deployment guide - **Start here!** |
+| **[DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)** | Fast-track deployment (4 steps) |
+| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Common issues and solutions |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | System architecture overview |
+| **[docs/API.md](docs/API.md)** | API documentation |
+| **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Configuration guide |
 
 ## 📞 Contact
 

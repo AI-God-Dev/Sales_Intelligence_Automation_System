@@ -2,6 +2,11 @@
 
 This directory contains all Phase 2 components: AI-powered intelligence and automation features.
 
+**Note**: All AI components now use the unified abstraction layer in `ai/` directory. This provides:
+- Provider-agnostic code (Vertex AI, OpenAI, Anthropic, Mock)
+- MOCK_MODE and LOCAL_MODE support for testing
+- Consistent error handling and retry logic
+
 ## Structure
 
 ```
@@ -11,6 +16,14 @@ intelligence/
 ├── nlp_query/          # Natural language to SQL queries
 ├── automation/         # Lead creation and HubSpot enrollment
 └── email_replies/      # AI email reply generation
+
+ai/                     # Unified AI abstraction layer (project root)
+├── models.py           # LLM provider abstraction
+├── embeddings.py       # Embedding provider abstraction
+├── semantic_search.py  # Semantic search provider
+├── scoring.py          # Scoring provider
+├── summarization.py    # Summarization provider
+└── insights.py         # Insights provider
 ```
 
 ## Components
@@ -29,9 +42,15 @@ Generates vector embeddings for emails and call transcripts using OpenAI or Vert
 ```python
 from intelligence.embeddings.generator import EmbeddingGenerator
 
+# Automatically uses MOCK_MODE if MOCK_MODE=1 environment variable is set
 generator = EmbeddingGenerator()
 # Generate embeddings for emails without them
 count = generator.update_email_embeddings(limit=1000)
+
+# Or use unified abstraction directly
+from ai.embeddings import get_embedding_provider
+provider = get_embedding_provider()  # Respects MOCK_MODE/LOCAL_MODE
+embedding = provider.generate_embedding("text to embed")
 ```
 
 **Cloud Function:** `POST /generate-embeddings`
@@ -56,8 +75,14 @@ Daily AI-powered account scoring using LLM analysis.
 ```python
 from intelligence.scoring.account_scorer import AccountScorer
 
+# Automatically uses MOCK_MODE if MOCK_MODE=1 environment variable is set
 scorer = AccountScorer()
 recommendation = scorer.score_account("account_123")
+
+# Or use unified abstraction directly
+from ai.scoring import get_scoring_provider
+scoring_provider = get_scoring_provider()  # Respects MOCK_MODE
+scores = scoring_provider.score_account("account_123", account_data)
 ```
 
 **Cloud Function:** `POST /account-scoring` (runs daily via Cloud Scheduler)

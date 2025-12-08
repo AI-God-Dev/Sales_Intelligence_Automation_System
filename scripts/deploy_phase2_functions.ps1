@@ -43,7 +43,7 @@ gcloud functions deploy generate-embeddings `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=generate_embeddings `
+  --entry-point=intelligence.embeddings.main.generate_embeddings `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -61,7 +61,7 @@ gcloud functions deploy account-scoring `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=account_scoring_job `
+  --entry-point=intelligence.scoring.main.account_scoring_job `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -79,7 +79,7 @@ gcloud functions deploy nlp-query `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=nlp_query `
+  --entry-point=intelligence.nlp_query.main.nlp_query `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -97,7 +97,7 @@ gcloud functions deploy create-leads `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=create_leads `
+  --entry-point=intelligence.automation.main.create_leads `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -115,7 +115,7 @@ gcloud functions deploy enroll-hubspot `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=enroll_hubspot `
+  --entry-point=intelligence.automation.main.enroll_hubspot `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -133,7 +133,7 @@ gcloud functions deploy get-hubspot-sequences `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=get_hubspot_sequences `
+  --entry-point=intelligence.automation.main.get_hubspot_sequences `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -151,7 +151,7 @@ gcloud functions deploy generate-email-reply `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=generate_email_reply `
+  --entry-point=intelligence.email_replies.main.generate_email_reply `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -169,7 +169,7 @@ gcloud functions deploy semantic-search `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=semantic_search `
+  --entry-point=intelligence.vector_search.main.semantic_search `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `

@@ -173,6 +173,12 @@ class Settings(BaseSettings):
     embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "vertex_ai")  # vertex_ai (recommended) or openai
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "textembedding-gecko@001")  # Vertex AI: textembedding-gecko@001 | OpenAI: text-embedding-3-small
     
+    # Local Testing & Mock Mode Configuration
+    # MOCK_MODE: Use fake/mock AI responses (for testing without API calls)
+    # LOCAL_MODE: Use local implementations (numpy embeddings, SQLite, etc.)
+    mock_mode: bool = os.getenv("MOCK_MODE", "0").strip().lower() in ("1", "true", "yes")
+    local_mode: bool = os.getenv("LOCAL_MODE", "0").strip().lower() in ("1", "true", "yes")
+    
     # Email Configuration
     gmail_mailboxes: list[str] = [
         "anand@maharaniweddings.com",

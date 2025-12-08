@@ -1,134 +1,39 @@
 """
 Embedding generation pipeline for emails and call transcripts.
-Supports OpenAI and Vertex AI embedding models.
+Uses unified AI abstraction layer for provider-agnostic embedding generation.
 """
 import logging
 from typing import List, Optional
 from google.cloud import bigquery
-import warnings
-from google.cloud import aiplatform
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
-
-# Suppress pkg_resources deprecation warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
-warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
-
-# Conditional imports
-try:
-    import openai
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
+from ai.embeddings import get_embedding_provider, EmbeddingProvider
 
 logger = setup_logger(__name__)
 
 
 class EmbeddingGenerator:
-    """Generate embeddings for text content using OpenAI or Vertex AI."""
+    """Generate embeddings for text content using unified AI abstraction layer."""
     
-    def __init__(self, bq_client: Optional[BigQueryClient] = None):
+    def __init__(self, bq_client: Optional[BigQueryClient] = None, embedding_provider: Optional[EmbeddingProvider] = None):
         self.bq_client = bq_client or BigQueryClient()
-        self.embedding_model = settings.embedding_model
-        
-        # Determine embedding provider (can be different from LLM provider)
-        embedding_provider = getattr(settings, 'embedding_provider', 'vertex_ai')
-        
-        if embedding_provider == "openai":
-            if not OPENAI_AVAILABLE:
-                raise ImportError("openai package not installed. Install with: pip install openai")
-            if not settings.openai_api_key:
-                raise ValueError("OpenAI API key not configured. Set 'openai-api-key' secret or use vertex_ai provider.")
-            self.client = openai.OpenAI(api_key=settings.openai_api_key)
-            self.embedding_provider = "openai"
-        elif embedding_provider == "vertex_ai":
-            try:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=UserWarning)
-                    warnings.filterwarnings("ignore", message=".*pkg_resources.*")
-                    aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
-                self.client = None
-                self.embedding_provider = "vertex_ai"
-            except Exception as e:
-                logger.error(f"Failed to initialize Vertex AI: {e}")
-                raise ValueError(f"Vertex AI initialization failed: {e}. Ensure Vertex AI API is enabled.")
-        else:
-            raise ValueError(f"Unsupported embedding provider: {embedding_provider}. Use 'vertex_ai' or 'openai'.")
+        # Use provided provider or get from factory (respects MOCK_MODE/LOCAL_MODE)
+        self.embedding_provider = embedding_provider or get_embedding_provider(
+            provider=settings.embedding_provider,
+            project_id=settings.gcp_project_id,
+            region=settings.gcp_region,
+            model_name=settings.embedding_model,
+            api_key=getattr(settings, 'openai_api_key', None) if settings.embedding_provider == 'openai' else None
+        )
     
     def generate_embedding(self, text: str) -> List[float]:
         """Generate embedding for a single text string."""
-        if not text or not text.strip():
-            return []
-        
-        try:
-            if self.embedding_provider == "openai":
-                # OpenAI embedding
-                if not self.client:
-                    raise ValueError("OpenAI client not initialized")
-                response = self.client.embeddings.create(
-                    model=self.embedding_model,
-                    input=text[:8000]  # Limit text length
-                )
-                return response.data[0].embedding
-            else:
-                # Vertex AI embedding
-                from vertexai.language_models import TextEmbeddingModel
-                model = TextEmbeddingModel.from_pretrained(self.embedding_model)
-                embeddings = model.get_embeddings([text[:8000]])
-                # Handle different response formats
-                if embeddings and len(embeddings) > 0:
-                    emb = embeddings[0]
-                    if hasattr(emb, 'values'):
-                        return emb.values
-                    elif isinstance(emb, list):
-                        return emb
-                    else:
-                        return list(emb)
-                return []
-        except Exception as e:
-            logger.error(f"Error generating embedding: {e}", exc_info=True)
-            return []
+        return self.embedding_provider.generate_embedding(text)
     
     def generate_embeddings_batch(self, texts: List[str], batch_size: int = 100) -> List[List[float]]:
         """Generate embeddings for multiple texts in batches."""
-        all_embeddings = []
-        
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            
-            try:
-                if self.embedding_provider == "openai":
-                    # OpenAI batch embedding
-                    if not self.client:
-                        raise ValueError("OpenAI client not initialized")
-                    response = self.client.embeddings.create(
-                        model=self.embedding_model,
-                        input=[t[:8000] for t in batch]
-                    )
-                    batch_embeddings = [item.embedding for item in response.data]
-                else:
-                    # Vertex AI batch embedding
-                    from vertexai.language_models import TextEmbeddingModel
-                    model = TextEmbeddingModel.from_pretrained(self.embedding_model)
-                    embeddings = model.get_embeddings([t[:8000] for t in batch])
-                    # Handle different response formats
-                    batch_embeddings = []
-                    for emb in embeddings:
-                        if hasattr(emb, 'values'):
-                            batch_embeddings.append(emb.values)
-                        elif isinstance(emb, list):
-                            batch_embeddings.append(emb)
-                        else:
-                            batch_embeddings.append(list(emb))
-                
-                all_embeddings.extend(batch_embeddings)
-            except Exception as e:
-                logger.error(f"Error generating batch embeddings: {e}", exc_info=True)
-                # Add empty embeddings for failed batch
-                all_embeddings.extend([[]] * len(batch))
-        
-        return all_embeddings
+        return self.embedding_provider.generate_embeddings_batch(texts, batch_size=batch_size)
     
     def update_email_embeddings(self, limit: Optional[int] = None):
         """Generate embeddings for emails that don't have them yet."""

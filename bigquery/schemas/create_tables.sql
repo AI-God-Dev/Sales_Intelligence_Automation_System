@@ -164,6 +164,20 @@ PARTITION BY DATE(call_time)
 CLUSTER BY user_id, matched_account_id
 OPTIONS(description="Call logs and transcripts from Dialpad");
 
+-- 8b. Dialpad Transcripts Table (separate table for detailed transcript data)
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.dialpad_transcripts` (
+  transcript_id STRING NOT NULL OPTIONS(description="UUID primary key"),
+  call_id STRING NOT NULL OPTIONS(description="Foreign key to dialpad_calls"),
+  speaker STRING OPTIONS(description="Speaker identifier"),
+  text_segment STRING OPTIONS(description="Transcript text segment"),
+  start_time_seconds FLOAT64 OPTIONS(description="Start time in call (seconds)"),
+  end_time_seconds FLOAT64 OPTIONS(description="End time in call (seconds)"),
+  segment_index INTEGER OPTIONS(description="Order of segment in transcript"),
+  created_at TIMESTAMP OPTIONS(description="When transcript was created")
+)
+CLUSTER BY call_id, segment_index
+OPTIONS(description="Detailed call transcript segments from Dialpad");
+
 -- 9. Account Recommendations Table
 CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.account_recommendations` (
   recommendation_id STRING NOT NULL OPTIONS(description="UUID primary key"),
@@ -191,6 +205,20 @@ CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.hubspo
   last_synced TIMESTAMP OPTIONS(description="Last sync from HubSpot")
 )
 OPTIONS(description="Available HubSpot sequences for enrollment");
+
+-- 10b. HubSpot Enrollments Table
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.hubspot_enrollments` (
+  enrollment_id STRING NOT NULL OPTIONS(description="UUID primary key"),
+  sequence_id STRING NOT NULL OPTIONS(description="Foreign key to hubspot_sequences"),
+  contact_email STRING NOT NULL OPTIONS(description="Contact email address enrolled"),
+  sf_contact_id STRING OPTIONS(description="Matched Salesforce Contact ID"),
+  enrolled_at TIMESTAMP OPTIONS(description="When enrollment occurred"),
+  status STRING OPTIONS(description="'active', 'paused', 'completed', 'unsubscribed'"),
+  created_at TIMESTAMP OPTIONS(description="When record was created"),
+  updated_at TIMESTAMP OPTIONS(description="Last update timestamp")
+)
+CLUSTER BY sequence_id, contact_email
+OPTIONS(description="HubSpot sequence enrollments tracking");
 
 -- 11. ETL Runs Table
 CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.etl_runs` (
@@ -223,6 +251,38 @@ CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.manual
 CLUSTER BY email_address, phone_number
 OPTIONS(description="Manual overrides for entity resolution");
 
+-- 12b. Entity Resolution Emails Table (dedicated table for email matching results)
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.entity_resolution_emails` (
+  resolution_id STRING NOT NULL OPTIONS(description="UUID primary key"),
+  email_address STRING NOT NULL OPTIONS(description="Normalized email address"),
+  sf_contact_id STRING OPTIONS(description="Matched Salesforce Contact ID"),
+  sf_account_id STRING OPTIONS(description="Resolved Account ID"),
+  match_confidence STRING OPTIONS(description="'exact', 'fuzzy', 'manual', or 'unmatched'"),
+  match_method STRING OPTIONS(description="'exact_match', 'domain_match', 'fuzzy_match', 'manual'"),
+  confidence_score FLOAT64 OPTIONS(description="Match confidence score (0-1)"),
+  resolved_at TIMESTAMP OPTIONS(description="When resolution was performed"),
+  last_verified_at TIMESTAMP OPTIONS(description="Last time resolution was verified"),
+  is_active BOOLEAN OPTIONS(description="Whether resolution is still active")
+)
+CLUSTER BY email_address, sf_contact_id
+OPTIONS(description="Email entity resolution results and matching history");
+
+-- 12c. Entity Resolution Phones Table (dedicated table for phone matching results)
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.entity_resolution_phones` (
+  resolution_id STRING NOT NULL OPTIONS(description="UUID primary key"),
+  phone_number STRING NOT NULL OPTIONS(description="Normalized phone number (E.164)"),
+  sf_contact_id STRING OPTIONS(description="Matched Salesforce Contact ID"),
+  sf_account_id STRING OPTIONS(description="Resolved Account ID"),
+  match_confidence STRING OPTIONS(description="'exact', 'fuzzy', 'manual', or 'unmatched'"),
+  match_method STRING OPTIONS(description="'exact_match', 'partial_match', 'fuzzy_match', 'manual'"),
+  confidence_score FLOAT64 OPTIONS(description="Match confidence score (0-1)"),
+  resolved_at TIMESTAMP OPTIONS(description="When resolution was performed"),
+  last_verified_at TIMESTAMP OPTIONS(description="Last time resolution was verified"),
+  is_active BOOLEAN OPTIONS(description="Whether resolution is still active")
+)
+CLUSTER BY phone_number, sf_contact_id
+OPTIONS(description="Phone entity resolution results and matching history");
+
 -- Create indexes for common queries
 -- Note: BigQuery uses clustering instead of indexes, but we can create views for optimization
 
@@ -236,6 +296,23 @@ CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.gmail_
 )
 CLUSTER BY mailbox_email
 OPTIONS(description="Tracks sync state for each Gmail mailbox");
+
+-- 14. Semantic Embeddings Table (optional centralized storage for embeddings)
+-- Note: Embeddings are also stored in gmail_messages.embedding and dialpad_calls.embedding
+-- This table provides a centralized view and can be used for cross-content semantic search
+CREATE TABLE IF NOT EXISTS `maharani-sales-hub-11-2025.sales_intelligence.semantic_embeddings` (
+  embedding_id STRING NOT NULL OPTIONS(description="UUID primary key"),
+  content_type STRING NOT NULL OPTIONS(description="'email', 'call', 'activity', 'opportunity'"),
+  content_id STRING NOT NULL OPTIONS(description="ID of the source content (message_id, call_id, etc.)"),
+  text_content STRING OPTIONS(description="Original text that was embedded"),
+  embedding ARRAY<FLOAT64> NOT NULL OPTIONS(description="Vector embedding"),
+  embedding_model STRING OPTIONS(description="Model used to generate embedding"),
+  embedding_dimensions INTEGER OPTIONS(description="Dimensionality of embedding"),
+  created_at TIMESTAMP OPTIONS(description="When embedding was generated"),
+  updated_at TIMESTAMP OPTIONS(description="Last update timestamp")
+)
+CLUSTER BY content_type, content_id
+OPTIONS(description="Centralized semantic embeddings for all content types");
 
 -- Create indexes for common queries
 -- Note: BigQuery uses clustering instead of indexes, but we can create views for optimization

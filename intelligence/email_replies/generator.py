@@ -1,23 +1,18 @@
 """
 AI email reply generation with context retrieval.
 Generates contextual email replies using LLM with full conversation history.
+Uses unified AI abstraction layer for provider-agnostic LLM calls.
 """
 import logging
-import warnings
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
-import anthropic
 from google.cloud import bigquery
-from google.cloud import aiplatform
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
-
-# Suppress pkg_resources deprecation warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
-warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
+from ai.models import get_model_provider, ModelProvider
 
 logger = setup_logger(__name__)
 
@@ -25,44 +20,20 @@ logger = setup_logger(__name__)
 class EmailReplyGenerator:
     """Generate AI-powered email replies with context."""
     
-    def __init__(self, bq_client: Optional[BigQueryClient] = None):
+    def __init__(self, bq_client: Optional[BigQueryClient] = None, model_provider: Optional[ModelProvider] = None):
         self.bq_client = bq_client or BigQueryClient()
-        self.llm_model = settings.llm_model
-        
-        if settings.llm_provider == "anthropic":
-            self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        elif settings.llm_provider == "vertex_ai":
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                warnings.filterwarnings("ignore", message=".*pkg_resources.*")
-                aiplatform.init(project=settings.gcp_project_id)
-            from vertexai.generative_models import GenerativeModel
-            self.model = GenerativeModel(self.llm_model)
-        else:
-            raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
+        # Use provided provider or get from factory (respects MOCK_MODE/LOCAL_MODE)
+        self.model_provider = model_provider or get_model_provider(
+            provider=settings.llm_provider,
+            project_id=settings.gcp_project_id,
+            region=settings.gcp_region,
+            model_name=settings.llm_model,
+            api_key=getattr(settings, 'anthropic_api_key', None) if settings.llm_provider == 'anthropic' else (getattr(settings, 'openai_api_key', None) if settings.llm_provider == 'openai' else None)
+        )
     
     def _call_llm(self, prompt: str, system_prompt: str = "") -> str:
-        """Call LLM with prompt and return response."""
-        try:
-            if settings.llm_provider == "anthropic":
-                message = self.client.messages.create(
-                    model=self.llm_model,
-                    max_tokens=2000,
-                    system=system_prompt,
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                return message.content[0].text
-            else:
-                # Vertex AI
-                response = self.model.generate_content(
-                    f"{system_prompt}\n\n{prompt}"
-                )
-                return response.text
-        except Exception as e:
-            logger.error(f"Error calling LLM: {e}", exc_info=True)
-            raise
+        """Call LLM with prompt and return response using unified abstraction."""
+        return self.model_provider.generate(prompt, system_prompt=system_prompt, max_tokens=2000)
     
     def get_email_thread(self, thread_id: str) -> List[Dict[str, Any]]:
         """Get all emails in a thread from BigQuery."""

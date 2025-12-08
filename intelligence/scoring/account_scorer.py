@@ -1,28 +1,18 @@
 """
 Daily account scoring using LLM analysis.
 Aggregates email, call, and activity data to generate priority scores.
+Uses unified AI abstraction layer for provider-agnostic LLM calls.
 """
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 import uuid
 from google.cloud import bigquery
-import warnings
-from google.cloud import aiplatform
 from utils.bigquery_client import BigQueryClient
 from utils.logger import setup_logger
 from config.config import settings
-
-# Suppress pkg_resources deprecation warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
-warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
-
-# Conditional import for Anthropic (only if needed)
-try:
-    import anthropic
-    ANTHROPIC_AVAILABLE = True
-except ImportError:
-    ANTHROPIC_AVAILABLE = False
+from ai.models import get_model_provider, ModelProvider
+from ai.scoring import get_scoring_provider, ScoringProvider
 
 logger = setup_logger(__name__)
 
@@ -30,70 +20,21 @@ logger = setup_logger(__name__)
 class AccountScorer:
     """Generate AI-powered account scores using LLM analysis."""
     
-    def __init__(self, bq_client: Optional[BigQueryClient] = None):
+    def __init__(self, bq_client: Optional[BigQueryClient] = None, model_provider: Optional[ModelProvider] = None, scoring_provider: Optional[ScoringProvider] = None):
         self.bq_client = bq_client or BigQueryClient()
-        self.llm_model = settings.llm_model
-        
-        if settings.llm_provider == "anthropic":
-            if not ANTHROPIC_AVAILABLE:
-                raise ImportError("anthropic package not installed. Install with: pip install anthropic")
-            if not settings.anthropic_api_key:
-                raise ValueError("Anthropic API key not configured. Set 'anthropic-api-key' secret or use vertex_ai provider.")
-            self.client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-            self.model = None
-        elif settings.llm_provider == "vertex_ai":
-            try:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=UserWarning)
-                    warnings.filterwarnings("ignore", message=".*pkg_resources.*")
-                    aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
-                
-                # Import vertexai first to ensure it's available
-                import vertexai
-                from vertexai.generative_models import GenerativeModel
-                self.model = GenerativeModel(self.llm_model)
-                self.client = None
-            except ImportError as e:
-                logger.error(f"Failed to import Vertex AI: {e}")
-                raise ValueError(f"Vertex AI package not found. Ensure 'vertexai' package is installed. Error: {e}")
-            except Exception as e:
-                logger.error(f"Failed to initialize Vertex AI: {e}")
-                raise ValueError(f"Vertex AI initialization failed: {e}. Ensure Vertex AI API is enabled and service account has permissions.")
-        else:
-            raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}. Use 'vertex_ai' or 'anthropic'.")
+        # Use provided providers or get from factory (respects MOCK_MODE/LOCAL_MODE)
+        self.model_provider = model_provider or get_model_provider(
+            provider=settings.llm_provider,
+            project_id=settings.gcp_project_id,
+            region=settings.gcp_region,
+            model_name=settings.llm_model,
+            api_key=getattr(settings, 'anthropic_api_key', None) if settings.llm_provider == 'anthropic' else (getattr(settings, 'openai_api_key', None) if settings.llm_provider == 'openai' else None)
+        )
+        self.scoring_provider = scoring_provider or get_scoring_provider(model_provider=self.model_provider, bq_client=self.bq_client)
     
     def _call_llm(self, prompt: str, system_prompt: str = "") -> str:
-        """Call LLM with prompt and return response."""
-        try:
-            if settings.llm_provider == "anthropic":
-                if not self.client:
-                    raise ValueError("Anthropic client not initialized")
-                message = self.client.messages.create(
-                    model=self.llm_model,
-                    max_tokens=2000,
-                    system=system_prompt,
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ]
-                )
-                return message.content[0].text
-            else:
-                # Vertex AI
-                if not self.model:
-                    raise ValueError("Vertex AI model not initialized")
-                # Combine system prompt and user prompt
-                full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-                response = self.model.generate_content(full_prompt)
-                # Handle Vertex AI response format
-                if hasattr(response, 'text'):
-                    return response.text
-                elif hasattr(response, 'candidates') and response.candidates:
-                    return response.candidates[0].content.parts[0].text
-                else:
-                    raise ValueError(f"Unexpected Vertex AI response format: {response}")
-        except Exception as e:
-            logger.error(f"Error calling LLM: {e}", exc_info=True)
-            raise
+        """Call LLM with prompt and return response using unified abstraction."""
+        return self.model_provider.generate(prompt, system_prompt=system_prompt, max_tokens=2000)
     
     def get_account_data(self, account_id: str) -> Dict[str, Any]:
         """Aggregate all relevant data for an account."""
@@ -202,68 +143,10 @@ class AccountScorer:
         
         account_data = self.get_account_data(account_id)
         
-        # Build prompt for LLM
-        prompt = self._build_scoring_prompt(account_data)
-        
-        system_prompt = """You are a sales intelligence analyst. Analyze account data and provide:
-1. Priority Score (0-100): Overall priority based on engagement, opportunities, and buying signals
-2. Budget Likelihood (0-100): Likelihood they're discussing 2026 budget based on communication signals
-3. Engagement Score (0-100): Recent engagement level
-4. Reasoning: Brief explanation of scores
-5. Recommended Action: Next step to take
-6. Key Signals: Array of detected buying signals
-
-Respond in JSON format:
-{
-  "priority_score": <int>,
-  "budget_likelihood": <int>,
-  "engagement_score": <int>,
-  "reasoning": "<string>",
-  "recommended_action": "<string>",
-  "key_signals": ["<signal1>", "<signal2>"]
-}"""
-        
+        # Use unified scoring provider
         try:
-            response = self._call_llm(prompt, system_prompt)
-            # Parse JSON response
-            import json
-            import re
-            
-            # Extract JSON from response
-            json_match = re.search(r'\{[\s\S]*\}', response)
-            if json_match:
-                try:
-                    score_data = json.loads(json_match.group())
-                    # Validate and sanitize score data
-                    score_data = {
-                        "priority_score": max(0, min(100, int(score_data.get("priority_score", 50)))),
-                        "budget_likelihood": max(0, min(100, int(score_data.get("budget_likelihood", 50)))),
-                        "engagement_score": max(0, min(100, int(score_data.get("engagement_score", 50)))),
-                        "reasoning": str(score_data.get("reasoning", ""))[:1000],  # Limit length
-                        "recommended_action": str(score_data.get("recommended_action", ""))[:500],  # Limit length
-                        "key_signals": list(score_data.get("key_signals", []))[:20]  # Limit to 20 signals
-                    }
-                except (json.JSONDecodeError, ValueError, TypeError) as e:
-                    logger.warning(f"Could not parse or validate JSON from LLM response: {e}. Response: {response[:500]}")
-                    score_data = {
-                        "priority_score": 50,
-                        "budget_likelihood": 50,
-                        "engagement_score": 50,
-                        "reasoning": f"Unable to parse LLM response: {str(e)[:200]}",
-                        "recommended_action": "Review account manually",
-                        "key_signals": []
-                    }
-            else:
-                # Fallback if no JSON found
-                logger.warning(f"Could not find JSON in LLM response: {response[:500]}")
-                score_data = {
-                    "priority_score": 50,
-                    "budget_likelihood": 50,
-                    "engagement_score": 50,
-                    "reasoning": "Unable to parse LLM response - no JSON found",
-                    "recommended_action": "Review account manually",
-                    "key_signals": []
-                }
+            score_data = self.scoring_provider.score_account(account_id, account_data)
+            # Score data is already validated by scoring provider
             
             # Determine last interaction date
             last_interaction = None
@@ -320,7 +203,9 @@ Respond in JSON format:
             raise
     
     def _build_scoring_prompt(self, account_data: Dict[str, Any]) -> str:
-        """Build prompt for LLM scoring."""
+        """Build prompt for LLM scoring. Used by scoring provider internally."""
+        # This method is kept for backward compatibility but scoring provider has its own
+        # The scoring provider's _build_scoring_prompt is used instead
         prompt_parts = [
             f"Account: {account_data.get('account_name', 'Unknown')}",
             f"Industry: {account_data.get('industry', 'Unknown')}",
