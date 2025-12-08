@@ -3,6 +3,7 @@
 
 $PROJECT_ID = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "maharani-sales-hub-11-2025" }
 $REGION = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
+$DATASET_NAME = if ($env:BQ_DATASET_NAME) { $env:BQ_DATASET_NAME } elseif ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
 $SERVICE_ACCOUNT_NAME = if ($env:GCP_SERVICE_ACCOUNT_NAME) { $env:GCP_SERVICE_ACCOUNT_NAME } else { "sales-intel-poc-sa" }
 $SERVICE_ACCOUNT = "$SERVICE_ACCOUNT_NAME@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -24,12 +25,13 @@ gcloud functions deploy gmail-sync `
   --source=. `
   --entry-point=gmail_sync `
   --trigger-http `
+  --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
-  --memory=512MB `
+  --memory=2048MB `
   --timeout=540s `
   --max-instances=10 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" `
   --project=$PROJECT_ID
 
 Write-Host ""

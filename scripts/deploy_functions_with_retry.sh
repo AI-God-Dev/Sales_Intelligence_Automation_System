@@ -31,6 +31,13 @@ deploy_function() {
     while [ $retry_count -lt $MAX_RETRIES ]; do
         echo "Deploying $function_name (attempt $((retry_count + 1))/$MAX_RETRIES)..."
         
+        # Set memory based on function (gmail-sync needs 2GB)
+        if [ "$function_name" = "gmail-sync" ]; then
+            MEMORY="2048MB"
+        else
+            MEMORY="512MB"
+        fi
+        
         # Capture output and exit code
         deploy_output=$(gcloud functions deploy "$function_name" \
             --gen2 \
@@ -40,7 +47,7 @@ deploy_function() {
             --entry-point="$entry_point" \
             --trigger-http \
             --service-account=$SERVICE_ACCOUNT \
-            --memory=512MB \
+            --memory=$MEMORY \
             --timeout=540s \
             --max-instances=10 \
             --min-instances=0 \

@@ -127,7 +127,7 @@ print_header "Phase 1: Data Ingestion Functions"
 deploy_function "gmail-sync" \
     "gmail_sync" \
     "Gmail message ingestion" \
-    512 540 && PHASE1_GMAIL=1 || PHASE1_GMAIL=0
+    2048 540 && PHASE1_GMAIL=1 || PHASE1_GMAIL=0
 
 deploy_function "salesforce-sync" \
     "salesforce_sync" \

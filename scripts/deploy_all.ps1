@@ -145,7 +145,7 @@ $phase1Functions = @(
         Name = "gmail-sync"
         EntryPoint = "gmail_sync"
         Description = "Gmail message ingestion"
-        MemoryMB = 512
+        MemoryMB = 2048
         TimeoutSeconds = 540
     },
     @{

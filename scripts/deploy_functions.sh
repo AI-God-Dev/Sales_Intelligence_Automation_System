@@ -28,7 +28,7 @@ gcloud functions deploy gmail-sync \
   --entry-point=gmail_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
-  --memory=512MB \
+  --memory=2048MB \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
