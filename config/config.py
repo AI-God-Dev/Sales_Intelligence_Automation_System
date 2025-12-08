@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     # GCP Configuration
     gcp_project_id: str = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025").strip()
     gcp_region: str = os.getenv("GCP_REGION", "us-central1").strip()
-    bigquery_dataset: str = os.getenv("BIGQUERY_DATASET", "sales_intelligence")
+    # BigQuery dataset name (must come from env var)
+    bigquery_dataset: str = os.getenv("BQ_DATASET_NAME", os.getenv("BIGQUERY_DATASET", "sales_intelligence"))
     
     # Secret Manager client (instance variable)
     _secret_client: Optional[secretmanager.SecretManagerServiceClient] = None

@@ -7,7 +7,7 @@ This document provides complete configuration details for the Sales Intelligence
 - **GCP Project ID**: `maharani-sales-hub-11-2025`
 - **Service Account**: `sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com`
 - **Region**: `us-central1`
-- **BigQuery Dataset**: `sales_intelligence`
+- **BigQuery Dataset**: `BQ_DATASET_NAME` (`sales_intelligence` default; `sales_intelligence_dev` in client env)
 
 ## Environment Variables
 
@@ -17,16 +17,16 @@ Create a `.env` file in the project root (see `.env.example`):
 # GCP Configuration
 GCP_PROJECT_ID=maharani-sales-hub-11-2025
 GCP_REGION=us-central1
-BIGQUERY_DATASET=sales_intelligence
+BQ_DATASET_NAME=sales_intelligence  # override to sales_intelligence_dev in client env
 
 # Salesforce Configuration
 # Use "login" for production, "test" for sandbox
 SALESFORCE_DOMAIN=test
 
-# LLM Configuration
-LLM_PROVIDER=anthropic
-LLM_MODEL=claude-3-5-sonnet-20241022
-EMBEDDING_MODEL=text-embedding-3-small
+# LLM Configuration (Vertex-only)
+LLM_PROVIDER=vertex_ai
+LLM_MODEL=gemini-1.5-pro
+EMBEDDING_MODEL=textembedding-gecko@001
 ```
 
 ## Terraform Variables

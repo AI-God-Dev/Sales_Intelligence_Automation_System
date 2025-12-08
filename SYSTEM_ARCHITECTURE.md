@@ -89,7 +89,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 4. **Storage**: `gmail_messages` and `gmail_participants` tables
 
 **Cloud Function**: `gmail-sync`
-- Entry Point: `cloud_functions.gmail_sync.main.gmail_sync`
+- Entry Point: `gmail_sync` (root `main.py`)
 - Trigger: Cloud Scheduler (hourly) or HTTP POST
 - Memory: 512MB
 - Timeout: 540 seconds
@@ -115,7 +115,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 3. **Data Quality**: Validates required fields, handles missing data gracefully
 
 **Cloud Function**: `salesforce-sync`
-- Entry Point: `cloud_functions.salesforce_sync.main.salesforce_sync`
+- Entry Point: `salesforce_sync` (root `main.py`)
 - Trigger: Cloud Scheduler (daily) or HTTP POST
 - Memory: 512MB
 - Timeout: 540 seconds
@@ -136,7 +136,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 3. **Transcript Processing**: Full transcripts stored in `dialpad_calls` and `dialpad_transcripts` tables
 
 **Cloud Function**: `dialpad-sync`
-- Entry Point: `cloud_functions.dialpad_sync.main.dialpad_sync`
+- Entry Point: `dialpad_sync` (root `main.py`)
 - Trigger: Cloud Scheduler (daily) or HTTP POST
 - Memory: 512MB
 - Timeout: 540 seconds
@@ -155,7 +155,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 3. **Enrollment Tracking**: Enrollments tracked in `hubspot_enrollments` table
 
 **Cloud Function**: `hubspot-sync`
-- Entry Point: `cloud_functions.hubspot_sync.main.hubspot_sync`
+- Entry Point: `hubspot_sync` (root `main.py`)
 - Trigger: Cloud Scheduler (daily) or HTTP POST
 - Memory: 512MB
 - Timeout: 540 seconds
@@ -183,7 +183,7 @@ The Sales Intelligence Automation System is a **multi-layer, enterprise-grade pl
 4. Weekly reconciliation job re-runs matching
 
 **Cloud Function**: `entity-resolution`
-- Entry Point: `cloud_functions.entity_resolution.main.entity_resolution`
+- Entry Point: `entity_resolution` (root `main.py`)
 - Trigger: After each sync or HTTP POST
 - Memory: 512MB
 - Timeout: 540 seconds

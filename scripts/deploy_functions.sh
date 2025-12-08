@@ -6,6 +6,7 @@ set -e
 
 PROJECT_ID="${GCP_PROJECT_ID:-maharani-sales-hub-11-2025}"
 REGION="${GCP_REGION:-us-central1}"
+DATASET_NAME="${BQ_DATASET_NAME:-${BIGQUERY_DATASET:-sales_intelligence}}"
 SERVICE_ACCOUNT_NAME="${GCP_SERVICE_ACCOUNT_NAME:-sales-intel-poc-sa}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -31,7 +32,7 @@ gcloud functions deploy gmail-sync \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" \
   --project=$PROJECT_ID
 
 # Deploy Salesforce Sync Function
@@ -50,7 +51,7 @@ gcloud functions deploy salesforce-sync \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,SALESFORCE_DOMAIN=$SALESFORCE_DOMAIN" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,SALESFORCE_DOMAIN=$SALESFORCE_DOMAIN" \
   --project=$PROJECT_ID
 
 # Deploy Dialpad Sync Function
@@ -67,7 +68,7 @@ gcloud functions deploy dialpad-sync \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" \
   --project=$PROJECT_ID
 
 # Deploy HubSpot Sync Function
@@ -84,7 +85,7 @@ gcloud functions deploy hubspot-sync \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" \
   --project=$PROJECT_ID
 
 # Deploy Entity Resolution Function
@@ -101,7 +102,7 @@ gcloud functions deploy entity-resolution \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" \
   --project=$PROJECT_ID
 
 # Grant Cloud Scheduler permission to invoke functions

@@ -80,8 +80,8 @@ foreach ($api in $apis) {
    ```
 
 3. Check entry point format in deployment script:
-   - Should be: `cloud_functions.gmail_sync.main.gmail_sync`
-   - NOT: `gmail_sync` or `main.gmail_sync`
+   - **Gen2 requires root-level exports.** Use `--entry-point=gmail_sync` (or the short name) that is imported in root `main.py`.
+   - Do **not** use module paths like `cloud_functions.gmail_sync.main.gmail_sync` for Gen2.
 
 ---
 
@@ -283,7 +283,7 @@ gcloud secrets add-iam-policy-binding $SECRET_NAME `
    ```
 
 2. Use correct entry point format:
-   - For functions in `cloud_functions/`: `cloud_functions.gmail_sync.main.gmail_sync`
+   - For Gen2 deployments use root exports from `main.py`, e.g., `--entry-point=gmail_sync`
    - For functions in `intelligence/`: `intelligence.scoring.main.account_scoring_job`
 
 3. Redeploy with correct entry point:
@@ -397,7 +397,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID `
    ```
 
 2. Check entry point format:
-   - ✅ Correct: `cloud_functions.gmail_sync.main.gmail_sync`
+   - ✅ Correct for Gen2: `--entry-point=gmail_sync` (root `main.py`)
    - ❌ Wrong: `gmail_sync`
    - ❌ Wrong: `main.gmail_sync`
 

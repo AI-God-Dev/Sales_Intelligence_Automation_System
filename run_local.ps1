@@ -39,7 +39,7 @@ Write-Host ""
 Write-Host "Setting environment variables..." -ForegroundColor Yellow
 $env:GCP_PROJECT_ID = "maharani-sales-hub-11-2025"
 $env:GCP_REGION = "us-central1"
-$env:BIGQUERY_DATASET = "sales_intelligence"
+$env:BQ_DATASET_NAME = "sales_intelligence"
 Write-Host "✅ Environment variables set" -ForegroundColor Green
 Write-Host ""
 

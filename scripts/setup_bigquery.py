@@ -285,7 +285,7 @@ def main():
     
     # Get project ID from environment or use default
     project_id = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
-    dataset_id = os.getenv("BIGQUERY_DATASET", "sales_intelligence")
+    dataset_id = os.getenv("BQ_DATASET_NAME") or os.getenv("BIGQUERY_DATASET", "sales_intelligence")
     
     print("=" * 60)
     print("Setting up BigQuery Tables for Sales Intelligence")

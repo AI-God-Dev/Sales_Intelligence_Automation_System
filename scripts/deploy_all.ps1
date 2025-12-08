@@ -22,6 +22,7 @@ $ErrorActionPreference = "Stop"
 # ============================================================================
 $PROJECT_ID = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "YOUR_PROJECT_ID" }
 $REGION = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
+$DATASET_NAME = if ($env:BQ_DATASET_NAME) { $env:BQ_DATASET_NAME } elseif ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
 $SERVICE_ACCOUNT_NAME = if ($env:GCP_SERVICE_ACCOUNT_NAME) { $env:GCP_SERVICE_ACCOUNT_NAME } else { "sales-intelligence-sa" }
 $SERVICE_ACCOUNT = "${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -68,7 +69,8 @@ function Deploy-Function {
     # Build environment variables
     $envVars = @(
         "GCP_PROJECT_ID=$PROJECT_ID",
-        "GCP_REGION=$REGION"
+        "GCP_REGION=$REGION",
+        "BQ_DATASET_NAME=$DATASET_NAME"
     )
     $envVars += $AdditionalEnvVars
     
@@ -141,35 +143,35 @@ Write-Header "Phase 1: Data Ingestion Functions"
 $phase1Functions = @(
     @{
         Name = "gmail-sync"
-        EntryPoint = "cloud_functions.gmail_sync.main.gmail_sync"
+        EntryPoint = "gmail_sync"
         Description = "Gmail message ingestion"
         MemoryMB = 512
         TimeoutSeconds = 540
     },
     @{
         Name = "salesforce-sync"
-        EntryPoint = "cloud_functions.salesforce_sync.main.salesforce_sync"
+        EntryPoint = "salesforce_sync"
         Description = "Salesforce object ingestion"
         MemoryMB = 512
         TimeoutSeconds = 540
     },
     @{
         Name = "dialpad-sync"
-        EntryPoint = "cloud_functions.dialpad_sync.main.dialpad_sync"
+        EntryPoint = "dialpad_sync"
         Description = "Dialpad call logs ingestion"
         MemoryMB = 512
         TimeoutSeconds = 540
     },
     @{
         Name = "hubspot-sync"
-        EntryPoint = "cloud_functions.hubspot_sync.main.hubspot_sync"
+        EntryPoint = "hubspot_sync"
         Description = "HubSpot sequences ingestion"
         MemoryMB = 512
         TimeoutSeconds = 300
     },
     @{
         Name = "entity-resolution"
-        EntryPoint = "cloud_functions.entity_resolution.main.entity_resolution"
+        EntryPoint = "entity_resolution"
         Description = "Entity resolution and matching"
         MemoryMB = 1024
         TimeoutSeconds = 540
@@ -196,7 +198,7 @@ Write-Header "Phase 2: Intelligence & Automation Functions"
 $phase2Functions = @(
     @{
         Name = "generate-embeddings"
-        EntryPoint = "intelligence.embeddings.main.generate_embeddings"
+        EntryPoint = "generate_embeddings"
         Description = "Generate vector embeddings for emails and calls"
         MemoryMB = 1024
         TimeoutSeconds = 540
@@ -204,7 +206,7 @@ $phase2Functions = @(
     },
     @{
         Name = "account-scoring"
-        EntryPoint = "intelligence.scoring.main.account_scoring_job"
+        EntryPoint = "account_scoring_job"
         Description = "AI-powered account scoring and prioritization"
         MemoryMB = 2048
         TimeoutSeconds = 540
@@ -213,7 +215,7 @@ $phase2Functions = @(
     },
     @{
         Name = "nlp-query"
-        EntryPoint = "intelligence.nlp_query.main.nlp_query"
+        EntryPoint = "nlp_query"
         Description = "Natural language to SQL query conversion"
         MemoryMB = 1024
         TimeoutSeconds = 60
@@ -221,7 +223,7 @@ $phase2Functions = @(
     },
     @{
         Name = "semantic-search"
-        EntryPoint = "intelligence.vector_search.main.semantic_search"
+        EntryPoint = "semantic_search"
         Description = "Semantic search using vector embeddings"
         MemoryMB = 1024
         TimeoutSeconds = 60
@@ -229,28 +231,28 @@ $phase2Functions = @(
     },
     @{
         Name = "create-leads"
-        EntryPoint = "intelligence.automation.main.create_leads"
+        EntryPoint = "create_leads"
         Description = "Create Salesforce leads from unmatched emails"
         MemoryMB = 512
         TimeoutSeconds = 300
     },
     @{
         Name = "enroll-hubspot"
-        EntryPoint = "intelligence.automation.main.enroll_hubspot"
+        EntryPoint = "enroll_hubspot"
         Description = "Enroll contacts in HubSpot sequences"
         MemoryMB = 512
         TimeoutSeconds = 300
     },
     @{
         Name = "get-hubspot-sequences"
-        EntryPoint = "intelligence.automation.main.get_hubspot_sequences"
+        EntryPoint = "get_hubspot_sequences"
         Description = "Get available HubSpot sequences"
         MemoryMB = 512
         TimeoutSeconds = 60
     },
     @{
         Name = "generate-email-reply"
-        EntryPoint = "intelligence.email_replies.main.generate_email_reply"
+        EntryPoint = "generate_email_reply"
         Description = "Generate AI email replies"
         MemoryMB = 1024
         TimeoutSeconds = 120

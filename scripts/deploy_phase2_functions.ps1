@@ -5,6 +5,7 @@ $ErrorActionPreference = "Stop"
 
 $PROJECT_ID = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "maharani-sales-hub-11-2025" }
 $REGION = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
+$DATASET_NAME = if ($env:BQ_DATASET_NAME) { $env:BQ_DATASET_NAME } elseif ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
 $SERVICE_ACCOUNT_NAME = if ($env:GCP_SERVICE_ACCOUNT_NAME) { $env:GCP_SERVICE_ACCOUNT_NAME } else { "sales-intel-poc-sa" }
 $SERVICE_ACCOUNT = "${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -43,7 +44,7 @@ gcloud functions deploy generate-embeddings `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.embeddings.main.generate_embeddings `
+  --entry-point=generate_embeddings `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -51,7 +52,7 @@ gcloud functions deploy generate-embeddings `
   --timeout=540s `
   --max-instances=5 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai,EMBEDDING_PROVIDER=vertex_ai" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai,EMBEDDING_PROVIDER=vertex_ai" `
   --project=$PROJECT_ID
 
 # Deploy Account Scoring Function
@@ -61,7 +62,7 @@ gcloud functions deploy account-scoring `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.scoring.main.account_scoring_job `
+  --entry-point=account_scoring_job `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -69,7 +70,7 @@ gcloud functions deploy account-scoring `
   --timeout=540s `
   --max-instances=3 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai" `
   --project=$PROJECT_ID
 
 # Deploy NLP Query Function
@@ -79,7 +80,7 @@ gcloud functions deploy nlp-query `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.nlp_query.main.nlp_query `
+  --entry-point=nlp_query `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -87,7 +88,7 @@ gcloud functions deploy nlp-query `
   --timeout=60s `
   --max-instances=10 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai" `
   --project=$PROJECT_ID
 
 # Deploy Lead Creation Function
@@ -97,7 +98,7 @@ gcloud functions deploy create-leads `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.automation.main.create_leads `
+  --entry-point=create_leads `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -105,7 +106,7 @@ gcloud functions deploy create-leads `
   --timeout=300s `
   --max-instances=5 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" `
   --project=$PROJECT_ID
 
 # Deploy HubSpot Enrollment Function
@@ -115,7 +116,7 @@ gcloud functions deploy enroll-hubspot `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.automation.main.enroll_hubspot `
+  --entry-point=enroll_hubspot `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -123,7 +124,7 @@ gcloud functions deploy enroll-hubspot `
   --timeout=300s `
   --max-instances=5 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" `
   --project=$PROJECT_ID
 
 # Deploy Get HubSpot Sequences Function
@@ -133,7 +134,7 @@ gcloud functions deploy get-hubspot-sequences `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.automation.main.get_hubspot_sequences `
+  --entry-point=get_hubspot_sequences `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -141,7 +142,7 @@ gcloud functions deploy get-hubspot-sequences `
   --timeout=60s `
   --max-instances=10 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" `
   --project=$PROJECT_ID
 
 # Deploy Email Reply Generator Function
@@ -151,7 +152,7 @@ gcloud functions deploy generate-email-reply `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.email_replies.main.generate_email_reply `
+  --entry-point=generate_email_reply `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -159,7 +160,7 @@ gcloud functions deploy generate-email-reply `
   --timeout=120s `
   --max-instances=10 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai" `
   --project=$PROJECT_ID
 
 # Deploy Semantic Search Function
@@ -169,7 +170,7 @@ gcloud functions deploy semantic-search `
   --runtime=python311 `
   --region=$REGION `
   --source=. `
-  --entry-point=intelligence.vector_search.main.semantic_search `
+  --entry-point=semantic_search `
   --trigger-http `
   --no-allow-unauthenticated `
   --service-account=$SERVICE_ACCOUNT `
@@ -177,7 +178,7 @@ gcloud functions deploy semantic-search `
   --timeout=60s `
   --max-instances=10 `
   --min-instances=0 `
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,EMBEDDING_PROVIDER=vertex_ai" `
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,EMBEDDING_PROVIDER=vertex_ai" `
   --project=$PROJECT_ID
 
 # Grant Cloud Scheduler permission to invoke functions

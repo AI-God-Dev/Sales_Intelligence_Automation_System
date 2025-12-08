@@ -24,6 +24,7 @@ set -e  # Exit on error
 # ============================================================================
 PROJECT_ID="${GCP_PROJECT_ID:-YOUR_PROJECT_ID}"
 REGION="${GCP_REGION:-us-central1}"
+DATASET_NAME="${BQ_DATASET_NAME:-${BIGQUERY_DATASET:-sales_intelligence}}"
 SERVICE_ACCOUNT_NAME="${GCP_SERVICE_ACCOUNT_NAME:-sales-intelligence-sa}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -65,7 +66,7 @@ deploy_function() {
     echo "  Memory: ${memory_mb}MB, Timeout: ${timeout_seconds}s"
     
     # Build environment variables
-    local env_vars=("GCP_PROJECT_ID=$PROJECT_ID" "GCP_REGION=$REGION")
+    local env_vars=("GCP_PROJECT_ID=$PROJECT_ID" "GCP_REGION=$REGION" "BQ_DATASET_NAME=$DATASET_NAME")
     env_vars+=("${additional_env_vars[@]}")
     local env_vars_string=$(IFS=','; echo "${env_vars[*]}")
     
@@ -124,27 +125,27 @@ print_header "Phase 1: Data Ingestion Functions"
 
 # Deploy Phase 1 functions
 deploy_function "gmail-sync" \
-    "cloud_functions.gmail_sync.main.gmail_sync" \
+    "gmail_sync" \
     "Gmail message ingestion" \
     512 540 && PHASE1_GMAIL=1 || PHASE1_GMAIL=0
 
 deploy_function "salesforce-sync" \
-    "cloud_functions.salesforce_sync.main.salesforce_sync" \
+    "salesforce_sync" \
     "Salesforce object ingestion" \
     512 540 && PHASE1_SF=1 || PHASE1_SF=0
 
 deploy_function "dialpad-sync" \
-    "cloud_functions.dialpad_sync.main.dialpad_sync" \
+    "dialpad_sync" \
     "Dialpad call logs ingestion" \
     512 540 && PHASE1_DIALPAD=1 || PHASE1_DIALPAD=0
 
 deploy_function "hubspot-sync" \
-    "cloud_functions.hubspot_sync.main.hubspot_sync" \
+    "hubspot_sync" \
     "HubSpot sequences ingestion" \
     512 300 && PHASE1_HUBSPOT=1 || PHASE1_HUBSPOT=0
 
 deploy_function "entity-resolution" \
-    "cloud_functions.entity_resolution.main.entity_resolution" \
+    "entity_resolution" \
     "Entity resolution and matching" \
     1024 540 && PHASE1_ER=1 || PHASE1_ER=0
 
@@ -156,46 +157,46 @@ print_header "Phase 2: Intelligence & Automation Functions"
 
 # Deploy Phase 2 functions
 deploy_function "generate-embeddings" \
-    "intelligence.embeddings.main.generate_embeddings" \
+    "generate_embeddings" \
     "Generate vector embeddings for emails and calls" \
     1024 540 10 \
     "LLM_PROVIDER=vertex_ai" "EMBEDDING_PROVIDER=vertex_ai" && PHASE2_EMBED=1 || PHASE2_EMBED=0
 
 deploy_function "account-scoring" \
-    "intelligence.scoring.main.account_scoring_job" \
+    "account_scoring_job" \
     "AI-powered account scoring and prioritization" \
     2048 540 3 \
     "LLM_PROVIDER=vertex_ai" && PHASE2_SCORING=1 || PHASE2_SCORING=0
 
 deploy_function "nlp-query" \
-    "intelligence.nlp_query.main.nlp_query" \
+    "nlp_query" \
     "Natural language to SQL query conversion" \
     1024 60 10 \
     "LLM_PROVIDER=vertex_ai" && PHASE2_NLP=1 || PHASE2_NLP=0
 
 deploy_function "semantic-search" \
-    "intelligence.vector_search.main.semantic_search" \
+    "semantic_search" \
     "Semantic search using vector embeddings" \
     1024 60 10 \
     "EMBEDDING_PROVIDER=vertex_ai" && PHASE2_SEARCH=1 || PHASE2_SEARCH=0
 
 deploy_function "create-leads" \
-    "intelligence.automation.main.create_leads" \
+    "create_leads" \
     "Create Salesforce leads from unmatched emails" \
     512 300 5 && PHASE2_LEADS=1 || PHASE2_LEADS=0
 
 deploy_function "enroll-hubspot" \
-    "intelligence.automation.main.enroll_hubspot" \
+    "enroll_hubspot" \
     "Enroll contacts in HubSpot sequences" \
     512 300 5 && PHASE2_ENROLL=1 || PHASE2_ENROLL=0
 
 deploy_function "get-hubspot-sequences" \
-    "intelligence.automation.main.get_hubspot_sequences" \
+    "get_hubspot_sequences" \
     "Get available HubSpot sequences" \
     512 60 10 && PHASE2_SEQUENCES=1 || PHASE2_SEQUENCES=0
 
 deploy_function "generate-email-reply" \
-    "intelligence.email_replies.main.generate_email_reply" \
+    "generate_email_reply" \
     "Generate AI email replies" \
     1024 120 10 \
     "LLM_PROVIDER=vertex_ai" && PHASE2_EMAIL=1 || PHASE2_EMAIL=0

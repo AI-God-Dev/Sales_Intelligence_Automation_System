@@ -98,19 +98,7 @@ This document lists all secrets that need to be stored in Google Secret Manager 
 
 ## LLM Provider Secrets
 
-### `openai-api-key`
-- **Description**: OpenAI API key for embeddings and LLM
-- **Format**: String (e.g., `sk-...`)
-- **Source**: OpenAI Platform → API Keys
-- **Usage**: Used for text embeddings and LLM calls (if OpenAI is selected)
-- **Required**: Conditional (if using OpenAI)
-
-### `anthropic-api-key`
-- **Description**: Anthropic Claude API key
-- **Format**: String (e.g., `sk-ant-...`)
-- **Source**: Anthropic Console → API Keys
-- **Usage**: Used for LLM calls (if Anthropic is selected)
-- **Required**: Conditional (if using Anthropic)
+- Vertex AI only; uses Application Default Credentials (ADC). No OpenAI/Anthropic secrets are required.
 
 ## Secret Creation Commands
 
@@ -120,16 +108,11 @@ Use the following commands to create and populate secrets:
 # Set project ID
 export PROJECT_ID="maharani-sales-hub-11-2025"
 
-# Create secret (empty initially)
-echo -n "" | gcloud secrets create SECRET_NAME \
+# Create secret (example)
+echo -n "YOUR_SECRET_VALUE" | gcloud secrets create SECRET_NAME \
   --data-file=- \
   --project="$PROJECT_ID" \
   --replication-policy="automatic"
-
-# Add secret value
-echo -n "YOUR_SECRET_VALUE" | gcloud secrets versions add SECRET_NAME \
-  --data-file=- \
-  --project="$PROJECT_ID"
 
 # Grant service account access
 gcloud secrets add-iam-policy-binding SECRET_NAME \

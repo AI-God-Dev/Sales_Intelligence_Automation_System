@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 # Get configuration from environment variables or use defaults
 $projectId = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "maharani-sales-hub-11-2025" }
 $region = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
-$datasetId = if ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
+$datasetId = if ($env:BQ_DATASET_NAME) { $env:BQ_DATASET_NAME } elseif ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
 
 # Validate required variables
 if (-not $projectId) {

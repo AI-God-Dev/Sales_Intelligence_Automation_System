@@ -287,20 +287,20 @@ gcloud scheduler jobs create http generate-embeddings-daily \
 # GCP Configuration
 GCP_PROJECT_ID=maharani-sales-hub-11-2025
 GCP_REGION=us-central1
-BIGQUERY_DATASET=sales_intelligence
+BQ_DATASET_NAME=sales_intelligence  # override to sales_intelligence_dev in client env
 
-# LLM Configuration (defaults to Vertex AI)
-LLM_PROVIDER=vertex_ai  # or anthropic
-LLM_MODEL=gemini-pro  # or claude-3-5-sonnet-20241022
-EMBEDDING_PROVIDER=vertex_ai  # or openai
-EMBEDDING_MODEL=textembedding-gecko@001  # or text-embedding-3-small
+# LLM Configuration (Vertex-only)
+LLM_PROVIDER=vertex_ai
+LLM_MODEL=gemini-1.5-pro
+EMBEDDING_PROVIDER=vertex_ai
+EMBEDDING_MODEL=textembedding-gecko@001
 ```
 
 ### Secrets Required
 
 All secrets from Phase 1, plus:
 - No additional secrets needed for Vertex AI (uses service account)
-- Optional: `anthropic-api-key` or `openai-api-key` if not using Vertex AI
+- Vertex-only: no OpenAI/Anthropic keys (ADC)
 
 ---
 

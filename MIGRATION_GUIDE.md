@@ -160,11 +160,11 @@ response = provider.generate("test")
 ### Provider Selection
 
 ```bash
-# LLM Provider
-LLM_PROVIDER=vertex_ai  # or openai, anthropic, mock
+# LLM Provider (Vertex-only; mock allowed for testing)
+LLM_PROVIDER=vertex_ai  # or mock
 
-# Embedding Provider
-EMBEDDING_PROVIDER=vertex_ai  # or openai, local, mock
+# Embedding Provider (Vertex-only; local/mock for testing)
+EMBEDDING_PROVIDER=vertex_ai  # or local, mock
 
 # Testing Modes
 MOCK_MODE=1  # Use fake responses

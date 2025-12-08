@@ -110,8 +110,7 @@ gcloud secrets list --project=$GCP_PROJECT_ID
 # - salesforce-refresh-token (optional)
 # - dialpad-api-key
 # - hubspot-api-key
-# - openai-api-key (optional)
-# - anthropic-api-key (optional)
+# Vertex-only: no OpenAI/Anthropic secrets required
 ```
 
 ### Step 5: Deploy Functions

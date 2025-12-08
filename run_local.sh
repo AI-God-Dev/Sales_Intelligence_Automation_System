@@ -40,7 +40,7 @@ echo ""
 echo "Setting environment variables..."
 export GCP_PROJECT_ID="maharani-sales-hub-11-2025"
 export GCP_REGION="us-central1"
-export BIGQUERY_DATASET="sales_intelligence"
+export BQ_DATASET_NAME="sales_intelligence"
 echo "✅ Environment variables set"
 echo ""
 

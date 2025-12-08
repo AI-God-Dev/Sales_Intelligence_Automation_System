@@ -191,9 +191,7 @@ gcloud secrets create dialpad-api-key --project=$PROJECT_ID
 # HubSpot secret
 gcloud secrets create hubspot-api-key --project=$PROJECT_ID
 
-# Optional: LLM API keys (if not using Vertex AI)
-gcloud secrets create openai-api-key --project=$PROJECT_ID
-gcloud secrets create anthropic-api-key --project=$PROJECT_ID
+# Vertex-only: no OpenAI/Anthropic secrets required (ADC)
 ```
 
 #### 4.2 Add Secret Values
@@ -222,8 +220,7 @@ $SERVICE_ACCOUNT = "sales-intelligence-sa@$PROJECT_ID.iam.gserviceaccount.com"
 $secrets = @(
     "salesforce-client-id", "salesforce-client-secret", "salesforce-username",
     "salesforce-password", "salesforce-security-token", "salesforce-refresh-token",
-    "salesforce-instance-url", "dialpad-api-key", "hubspot-api-key",
-    "openai-api-key", "anthropic-api-key"
+    "salesforce-instance-url", "dialpad-api-key", "hubspot-api-key"
 )
 
 foreach ($secret in $secrets) {

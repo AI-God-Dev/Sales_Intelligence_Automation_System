@@ -94,7 +94,7 @@ Region: us-central1
 Service Account: [same as GCP service account]
 ```
 
-## Secret Manager Secret Names
+## Secret Manager Secret Names (Vertex-only)
 
 ```
 salesforce-username
@@ -102,8 +102,6 @@ salesforce-password
 salesforce-security-token
 dialpad-api-key
 hubspot-api-key
-openai-api-key
-anthropic-api-key
 ```
 
 ## Environment Variables
@@ -112,11 +110,11 @@ anthropic-api-key
 # Copy to .env file (DO NOT COMMIT)
 GCP_PROJECT_ID=[your-project-id]
 GCP_REGION=us-central1
-BIGQUERY_DATASET=sales_intelligence
+BQ_DATASET_NAME=sales_intelligence  # override to sales_intelligence_dev in client env
 SALESFORCE_DOMAIN=login
-LLM_PROVIDER=anthropic
-LLM_MODEL=claude-3-5-sonnet-20241022
-EMBEDDING_MODEL=text-embedding-3-small
+LLM_PROVIDER=vertex_ai
+LLM_MODEL=gemini-1.5-pro
+EMBEDDING_MODEL=textembedding-gecko@001
 GMAIL_OAUTH_CLIENT_ID=[client-id]
 GMAIL_OAUTH_CLIENT_SECRET=[client-secret]
 ```

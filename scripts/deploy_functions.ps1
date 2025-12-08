@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 # Get configuration from environment variables or use defaults
 $projectId = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "maharani-sales-hub-11-2025" }
 $region = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
+$dataset = if ($env:BQ_DATASET_NAME) { $env:BQ_DATASET_NAME } elseif ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
 $serviceAccount = if ($env:GCP_SERVICE_ACCOUNT) { $env:GCP_SERVICE_ACCOUNT } else { "sales-intel-poc-sa@$projectId.iam.gserviceaccount.com" }
 
 # Validate required variables
@@ -51,7 +52,7 @@ function Deploy-Function {
         --timeout=540s `
         --max-instances=10 `
         --min-instances=0 `
-        --set-env-vars="GCP_PROJECT_ID=$projectId,GCP_REGION=$region" `
+        --set-env-vars="GCP_PROJECT_ID=$projectId,GCP_REGION=$region,BQ_DATASET_NAME=$dataset" `
         --project=$projectId
     
     if ($LASTEXITCODE -ne 0) {
@@ -65,31 +66,31 @@ function Deploy-Function {
 }
 
 # Deploy all functions
-# IMPORTANT: Entry points must use full module path format: module.submodule.function
+# Entry points must be root-level names for Gen2
 $functions = @(
     @{
         Name = "gmail-sync"
-        EntryPoint = "cloud_functions.gmail_sync.main.gmail_sync"
+        EntryPoint = "gmail_sync"
         Description = "Gmail message ingestion"
     },
     @{
         Name = "salesforce-sync"
-        EntryPoint = "cloud_functions.salesforce_sync.main.salesforce_sync"
+        EntryPoint = "salesforce_sync"
         Description = "Salesforce object ingestion"
     },
     @{
         Name = "dialpad-sync"
-        EntryPoint = "cloud_functions.dialpad_sync.main.dialpad_sync"
+        EntryPoint = "dialpad_sync"
         Description = "Dialpad call logs ingestion"
     },
     @{
         Name = "hubspot-sync"
-        EntryPoint = "cloud_functions.hubspot_sync.main.hubspot_sync"
+        EntryPoint = "hubspot_sync"
         Description = "HubSpot sequences ingestion"
     },
     @{
         Name = "entity-resolution"
-        EntryPoint = "cloud_functions.entity_resolution.main.entity_resolution"
+        EntryPoint = "entity_resolution"
         Description = "Entity resolution and matching"
     }
 )

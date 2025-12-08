@@ -4,6 +4,11 @@
 
 This guide provides comprehensive instructions for running and testing the Sales Intelligence Automation System locally. The system supports **LOCAL_MODE** and **MOCK_MODE** for full offline development and testing capabilities.
 
+**Key requirements (Gen2 parity):**
+- Set `GCP_PROJECT_ID`, `GCP_REGION`, `BQ_DATASET_NAME` (default `sales_intelligence`; client uses `sales_intelligence_dev`).
+- functions-framework targets the root-exported name (e.g., `--target=gmail_sync`) since Gen2 resolves from root `main.py`.
+- AI is Vertex-only (ADC); no OpenAI/Anthropic keys are used locally or in Cloud Functions.
+
 ---
 
 ## Prerequisites

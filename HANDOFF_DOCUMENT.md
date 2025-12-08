@@ -347,7 +347,7 @@ All 16 required tables are present:
 | `DATASET_ID` | BigQuery dataset | No | `sales_intelligence` |
 | `MOCK_MODE` | Use mock AI responses | No | `0` |
 | `LOCAL_MODE` | Use local implementations | No | `0` |
-| `LLM_PROVIDER` | LLM provider (vertexai/openai/anthropic) | No | `vertexai` |
+| `LLM_PROVIDER` | LLM provider (vertex_ai or mock) | No | `vertex_ai` |
 | `EMBEDDING_PROVIDER` | Embedding provider | No | `vertexai` |
 
 ### Secret Manager Secrets
@@ -359,8 +359,7 @@ Required secrets (create using `create_secrets.ps1`):
 - `salesforce-refresh-token` (optional)
 - `dialpad-api-key`
 - `hubspot-api-key`
-- `openai-api-key` (optional, if using OpenAI)
-- `anthropic-api-key` (optional, if using Anthropic)
+- Vertex-only: no OpenAI/Anthropic keys required (ADC is used)
 
 ---
 

@@ -6,6 +6,7 @@
 
 PROJECT_ID="${GCP_PROJECT_ID:-maharani-sales-hub-11-2025}"
 REGION="${GCP_REGION:-us-central1}"
+DATASET_NAME="${BQ_DATASET_NAME:-${BIGQUERY_DATASET:-sales_intelligence}}"
 SERVICE_ACCOUNT="sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com"
 MAX_RETRIES=3
 RETRY_DELAY=30
@@ -43,7 +44,7 @@ deploy_function() {
             --timeout=540s \
             --max-instances=10 \
             --min-instances=0 \
-            --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION" \
+            --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME" \
             --project=$PROJECT_ID 2>&1)
         exit_code=$?
         

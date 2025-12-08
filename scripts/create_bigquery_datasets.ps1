@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 # CONFIGURATION
 # ============================================================================
 $PROJECT_ID = if ($env:GCP_PROJECT_ID) { $env:GCP_PROJECT_ID } else { "YOUR_PROJECT_ID" }
-$DATASET_ID = if ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
+$DATASET_ID = if ($env:BQ_DATASET_NAME) { $env:BQ_DATASET_NAME } elseif ($env:BIGQUERY_DATASET) { $env:BIGQUERY_DATASET } else { "sales_intelligence" }
 $REGION = if ($env:GCP_REGION) { $env:GCP_REGION } else { "us-central1" }
 
 # Validate configuration

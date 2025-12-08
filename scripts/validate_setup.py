@@ -45,7 +45,7 @@ def check_python_packages() -> tuple[bool, list[str]]:
 def check_env_variables() -> tuple[bool, list[str]]:
     """Check if required environment variables are set."""
     required = ["GCP_PROJECT_ID"]
-    optional = ["GCP_REGION", "BIGQUERY_DATASET", "GCP_SERVICE_ACCOUNT"]
+    optional = ["GCP_REGION", "BQ_DATASET_NAME", "GCP_SERVICE_ACCOUNT"]
     missing_required = []
     missing_optional = []
     

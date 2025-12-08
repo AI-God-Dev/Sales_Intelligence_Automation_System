@@ -94,7 +94,7 @@ Create a `.env` file or set environment variables:
 ```env
 GCP_PROJECT_ID=maharani-sales-hub-11-2025
 GCP_REGION=us-central1
-BIGQUERY_DATASET=sales_intelligence
+BQ_DATASET_NAME=sales_intelligence  # override to sales_intelligence_dev in client env
 ```
 
 ### Secrets Configuration
@@ -105,7 +105,7 @@ Ensure these secrets exist in Secret Manager:
 - `salesforce-security-token`
 - `dialpad-api-key`
 - `hubspot-api-key`
-- (Optional) `anthropic-api-key` or `openai-api-key` if not using Vertex AI
+- Vertex-only: no OpenAI/Anthropic secrets needed (ADC)
 
 ---
 
