@@ -47,7 +47,7 @@ gcloud functions deploy salesforce-sync \
   --entry-point=salesforce_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
-  --memory=512MB \
+  --memory=2048MB \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
@@ -64,7 +64,7 @@ gcloud functions deploy dialpad-sync \
   --entry-point=dialpad_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
-  --memory=512MB \
+  --memory=2048MB \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
@@ -81,7 +81,7 @@ gcloud functions deploy hubspot-sync \
   --entry-point=hubspot_sync \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
-  --memory=1024MB \
+  --memory=2048MB \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \
@@ -98,7 +98,7 @@ gcloud functions deploy entity-resolution \
   --entry-point=entity_resolution \
   --trigger-http \
   --service-account=$SERVICE_ACCOUNT \
-  --memory=512MB \
+  --memory=2048MB \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \

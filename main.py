@@ -10,8 +10,8 @@ Never use module paths in --entry-point for Gen2.
 """
 
 # Ingestion / sync Cloud Functions (Gen2 requires root-level exports)
-from cloud_functions.gmail_sync.main import gmail_sync
 from cloud_functions.salesforce_sync.main import salesforce_sync
+from cloud_functions.gmail_sync.main import gmail_sync
 from cloud_functions.dialpad_sync.main import dialpad_sync
 from cloud_functions.hubspot_sync.main import hubspot_sync
 from cloud_functions.entity_resolution.main import entity_resolution
@@ -26,8 +26,8 @@ from intelligence.nlp_query.main import nlp_query
 
 # Public exports for functions-framework / gcloud --entry-point
 __all__ = [
-    "gmail_sync",
     "salesforce_sync",
+    "gmail_sync",
     "dialpad_sync",
     "hubspot_sync",
     "entity_resolution",

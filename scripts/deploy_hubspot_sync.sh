@@ -6,6 +6,7 @@ set -e
 
 PROJECT_ID="${GCP_PROJECT_ID:-maharani-sales-hub-11-2025}"
 REGION="${GCP_REGION:-us-central1}"
+DATASET_NAME="${BQ_DATASET_NAME:-${BIGQUERY_DATASET:-sales_intelligence}}"
 SERVICE_ACCOUNT="sales-intel-poc-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # Get project root
@@ -22,6 +23,7 @@ ENV_VARS_FILE=$(mktemp)
 cat > "$ENV_VARS_FILE" <<EOF
 GCP_PROJECT_ID: $PROJECT_ID
 GCP_REGION: $REGION
+BQ_DATASET_NAME: $DATASET_NAME
 EOF
 
 # Deploy function
@@ -32,8 +34,9 @@ gcloud functions deploy hubspot-sync \
   --source=. \
   --entry-point=hubspot_sync \
   --trigger-http \
+  --no-allow-unauthenticated \
   --service-account=$SERVICE_ACCOUNT \
-  --memory=1024MB \
+  --memory=2048MB \
   --timeout=540s \
   --max-instances=10 \
   --min-instances=0 \

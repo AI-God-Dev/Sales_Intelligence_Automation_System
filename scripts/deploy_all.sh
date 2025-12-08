@@ -132,22 +132,22 @@ deploy_function "gmail-sync" \
 deploy_function "salesforce-sync" \
     "salesforce_sync" \
     "Salesforce object ingestion" \
-    512 540 && PHASE1_SF=1 || PHASE1_SF=0
+    2048 540 && PHASE1_SF=1 || PHASE1_SF=0
 
 deploy_function "dialpad-sync" \
     "dialpad_sync" \
     "Dialpad call logs ingestion" \
-    512 540 && PHASE1_DIALPAD=1 || PHASE1_DIALPAD=0
+    2048 540 && PHASE1_DIALPAD=1 || PHASE1_DIALPAD=0
 
 deploy_function "hubspot-sync" \
     "hubspot_sync" \
     "HubSpot sequences ingestion" \
-    512 300 && PHASE1_HUBSPOT=1 || PHASE1_HUBSPOT=0
+    2048 300 && PHASE1_HUBSPOT=1 || PHASE1_HUBSPOT=0
 
 deploy_function "entity-resolution" \
     "entity_resolution" \
     "Entity resolution and matching" \
-    1024 540 && PHASE1_ER=1 || PHASE1_ER=0
+    2048 540 && PHASE1_ER=1 || PHASE1_ER=0
 
 # ============================================================================
 # PHASE 2: INTELLIGENCE & AUTOMATION FUNCTIONS

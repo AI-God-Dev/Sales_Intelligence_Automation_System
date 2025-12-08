@@ -152,28 +152,28 @@ $phase1Functions = @(
         Name = "salesforce-sync"
         EntryPoint = "salesforce_sync"
         Description = "Salesforce object ingestion"
-        MemoryMB = 512
+        MemoryMB = 2048
         TimeoutSeconds = 540
     },
     @{
         Name = "dialpad-sync"
         EntryPoint = "dialpad_sync"
         Description = "Dialpad call logs ingestion"
-        MemoryMB = 512
+        MemoryMB = 2048
         TimeoutSeconds = 540
     },
     @{
         Name = "hubspot-sync"
         EntryPoint = "hubspot_sync"
         Description = "HubSpot sequences ingestion"
-        MemoryMB = 512
+        MemoryMB = 2048
         TimeoutSeconds = 300
     },
     @{
         Name = "entity-resolution"
         EntryPoint = "entity_resolution"
         Description = "Entity resolution and matching"
-        MemoryMB = 1024
+        MemoryMB = 2048
         TimeoutSeconds = 540
     }
 )

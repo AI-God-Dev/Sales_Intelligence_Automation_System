@@ -40,6 +40,13 @@ function Deploy-Function {
     Write-Host "Deploying $FunctionName..." -ForegroundColor Yellow
     Write-Host "  Entry Point: $EntryPoint" -ForegroundColor Gray
     
+    # Set memory based on function (all sync functions need 2GB)
+    $memory = if ($FunctionName -in @("gmail-sync", "salesforce-sync", "hubspot-sync", "dialpad-sync", "entity-resolution")) {
+        "2048MB"
+    } else {
+        "512MB"
+    }
+    
     gcloud functions deploy $FunctionName `
         --gen2 `
         --runtime=python311 `
@@ -48,7 +55,7 @@ function Deploy-Function {
         --entry-point=$EntryPoint `
         --trigger-http `
         --service-account=$serviceAccount `
-        --memory=512MB `
+        --memory=$memory `
         --timeout=540s `
         --max-instances=10 `
         --min-instances=0 `
