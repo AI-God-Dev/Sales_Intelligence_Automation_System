@@ -7,7 +7,9 @@ set -e
 PROJECT_ID="${GCP_PROJECT_ID:-maharani-sales-hub-11-2025}"
 REGION="${GCP_REGION:-us-central1}"
 DATASET_NAME="${BQ_DATASET_NAME:-sales_intelligence}"
-SERVICE_ACCOUNT="${SA_EMAIL:-sales-intelligence-sa@${PROJECT_ID}.iam.gserviceaccount.com}"
+
+# Use the correct service account
+SERVICE_ACCOUNT="sales-intel-poc-sa@${PROJECT_ID}.iam.gserviceaccount.com"
 
 echo "=========================================="
 echo "Fixing Cloud Functions Errors"
@@ -58,24 +60,72 @@ for func in "${FUNCTIONS[@]}"; do
 done
 
 echo ""
-echo "Step 2: Granting IAM invoker permissions..."
+echo "Step 2: Checking service account..."
+echo "  Function service account: $SERVICE_ACCOUNT"
+# Check if service account exists
+if gcloud iam service-accounts describe "$SERVICE_ACCOUNT" --project="$PROJECT_ID" &>/dev/null; then
+    echo "  ✓ Service account exists"
+else
+    echo "  ✗ Service account does not exist"
+    echo "  Creating service account: $SERVICE_ACCOUNT"
+    SA_NAME=$(echo "$SERVICE_ACCOUNT" | cut -d'@' -f1)
+    gcloud iam service-accounts create "$SA_NAME" \
+        --display-name="Sales Intelligence Service Account" \
+        --project="$PROJECT_ID" \
+        --quiet && echo "  ✓ Created service account" || echo "  ✗ Failed to create service account"
+fi
+
+echo ""
+echo "Step 3: Granting IAM invoker permissions on Cloud Run services..."
+# Get current user's email for invoker permission
+CURRENT_USER=$(gcloud config get-value account 2>/dev/null || echo "")
+if [ -n "$CURRENT_USER" ]; then
+    echo "  Current user: $CURRENT_USER"
+fi
+
 for func in "${FUNCTIONS[@]}"; do
     echo "  Granting invoker permission for $func..."
-    gcloud functions add-iam-policy-binding "$func" \
+    # Get the Cloud Run service name for this Gen2 function
+    SERVICE_NAME=$(gcloud functions describe "$func" \
         --gen2 \
         --region="$REGION" \
-        --member="serviceAccount:$SERVICE_ACCOUNT" \
-        --role="roles/cloudfunctions.invoker" \
         --project="$PROJECT_ID" \
-        --quiet || echo "  Warning: Failed to grant permission for $func"
+        --format="value(serviceConfig.service)" 2>/dev/null | sed 's/.*\///' || echo "")
+    
+    if [ -n "$SERVICE_NAME" ]; then
+        # Grant permission to current user (for testing)
+        if [ -n "$CURRENT_USER" ]; then
+            gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+                --region="$REGION" \
+                --member="user:$CURRENT_USER" \
+                --role="roles/run.invoker" \
+                --project="$PROJECT_ID" \
+                --quiet && echo "    ✓ Granted invoker permission to user" || echo "    ⚠ Could not grant to user (may already have permission)"
+        fi
+        
+        # Also grant to function's service account (for self-invocation if needed)
+        gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+            --region="$REGION" \
+            --member="serviceAccount:$SERVICE_ACCOUNT" \
+            --role="roles/run.invoker" \
+            --project="$PROJECT_ID" \
+            --quiet && echo "    ✓ Granted invoker permission to service account" || echo "    ⚠ Could not grant to service account (may already have permission)"
+    else
+        echo "    ✗ Could not find Cloud Run service for $func"
+    fi
 done
 
 echo ""
-echo "Step 3: Granting Secret Manager access..."
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-    --member="serviceAccount:$SERVICE_ACCOUNT" \
-    --role="roles/secretmanager.secretAccessor" \
-    --quiet || echo "  Warning: Failed to grant Secret Manager access"
+echo "Step 4: Granting Secret Manager access to function service account..."
+if gcloud iam service-accounts describe "$SERVICE_ACCOUNT" --project="$PROJECT_ID" &>/dev/null; then
+    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+        --member="serviceAccount:$SERVICE_ACCOUNT" \
+        --role="roles/secretmanager.secretAccessor" \
+        --quiet && echo "  ✓ Granted Secret Manager access" || echo "  ⚠ Could not grant (may already have permission)"
+else
+    echo "  ✗ Service account $SERVICE_ACCOUNT does not exist"
+    echo "  Please create it or update functions to use an existing service account"
+fi
 
 echo ""
 echo "=========================================="
