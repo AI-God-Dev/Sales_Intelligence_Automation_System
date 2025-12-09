@@ -90,98 +90,54 @@ invoke_function() {
         --project="$PROJECT_ID" \
         --format="value(serviceConfig.invokerConfig.allowedIngress)" 2>/dev/null || echo "ALL_TRAFFIC")
     
-    # Invoke function with timeout
-    # For gmail-sync, use async invocation since it can take > 5 minutes
+    # Invoke function
+    # Note: gcloud functions call doesn't support --async or --timeout flags
+    # The function timeout is configured during deployment, not during invocation
+    # For long-running functions, we use the timeout command to limit how long we wait
     if [ "$func_name" = "gmail-sync" ]; then
-        print_info "Using async invocation for gmail-sync (can take > 5 minutes)..."
-        local call_output=$(gcloud functions call "$func_name" \
+        print_info "Invoking gmail-sync (this may take several minutes)..."
+        # Use timeout command to limit wait time (600 seconds = 10 minutes)
+        # The function itself has a 540s timeout configured during deployment
+        response=$(timeout 600 gcloud functions call "$func_name" \
             --gen2 \
             --region="$REGION" \
             --project="$PROJECT_ID" \
-            --data="$payload" \
-            --async 2>&1)
+            --data="$payload" 2>&1) || exit_code=$?
         
-        local operation_id=$(echo "$call_output" | grep -oP 'operations/[^ ]+' | head -1 || echo "")
-        
-        if [ -z "$operation_id" ]; then
-            # Check for errors in the output
-            if echo "$call_output" | grep -qi "403\|Forbidden"; then
-                print_error "Authentication failed (403 Forbidden). Check IAM permissions."
-                echo "  Error: $call_output"
-                return 1
-            elif echo "$call_output" | grep -qi "500\|Internal Server Error"; then
-                print_error "Function returned 500 Internal Server Error"
-                echo "  Error: $call_output"
-                return 1
-            else
-                print_error "Failed to start async operation"
-                echo "  Error: $call_output"
-                return 1
-            fi
-        fi
-        
-        if [ -n "$operation_id" ]; then
-            print_info "Async operation started: $operation_id"
-            print_info "Waiting for completion (checking every 10s, max 10 minutes)..."
-            
-            local max_wait=600
-            local waited=0
-            while [ $waited -lt $max_wait ]; do
-                sleep 10
-                waited=$((waited + 10))
-                local op_status=$(gcloud functions operations describe "$operation_id" \
-                    --gen2 \
-                    --region="$REGION" \
-                    --project="$PROJECT_ID" \
-                    --format="json" 2>/dev/null || echo "{}")
-                
-                local done_status=$(echo "$op_status" | grep -o '"done":\s*true' || echo "")
-                local error_status=$(echo "$op_status" | grep -o '"error"' || echo "")
-                
-                if [ -n "$done_status" ]; then
-                    if [ -n "$error_status" ]; then
-                        print_error "Async operation failed"
-                        echo "  Operation status: $op_status"
-                        exit_code=1
-                    else
-                        print_success "Async operation completed"
-                        response=$(echo "$op_status" | grep -o '"response":\s*"[^"]*"' | head -1 || echo "Operation completed")
-                        exit_code=0
-                    fi
-                    break
-                fi
-                echo "  Still running... (${waited}s / ${max_wait}s)"
-            done
-            
-            if [ $waited -ge $max_wait ]; then
-                print_error "Async operation timed out after ${max_wait}s"
-                exit_code=124
-            fi
+        # Check if timeout command killed the process
+        if [ $exit_code -eq 124 ]; then
+            print_error "Invocation timed out after 600 seconds (function may still be running)"
+            return 1
         fi
     else
-        # For other functions, use regular invocation with longer timeout
-        # Use --timeout flag for gcloud instead of timeout command for better error handling
-        response=$(gcloud functions call "$func_name" \
+        # For other functions, use regular invocation with timeout wrapper
+        # Use timeout command to limit wait time (600 seconds = 10 minutes)
+        response=$(timeout 600 gcloud functions call "$func_name" \
             --gen2 \
             --region="$REGION" \
             --project="$PROJECT_ID" \
-            --data="$payload" \
-            --timeout=600 2>&1) || exit_code=$?
+            --data="$payload" 2>&1) || exit_code=$?
         
-        # Check for specific error patterns
-        if echo "$response" | grep -qi "403\|Forbidden"; then
-            print_error "Authentication failed (403 Forbidden). Check IAM permissions."
-            echo "  Error: $response"
-            return 1
-        elif echo "$response" | grep -qi "500\|Internal Server Error"; then
-            print_error "Function returned 500 Internal Server Error"
-            echo "  Error: $response"
-            return 1
-        elif echo "$response" | grep -qi "ReadTimeout\|read timeout"; then
-            print_error "Function timed out (read timeout)"
-            echo "  Error: $response"
+        # Check if timeout command killed the process
+        if [ $exit_code -eq 124 ]; then
+            print_error "Invocation timed out after 600 seconds (function may still be running)"
             return 1
         fi
+    fi
+    
+    # Check for specific error patterns
+    if echo "$response" | grep -qi "403\|Forbidden"; then
+        print_error "Authentication failed (403 Forbidden). Check IAM permissions."
+        echo "  Error: $response"
+        return 1
+    elif echo "$response" | grep -qi "500\|Internal Server Error"; then
+        print_error "Function returned 500 Internal Server Error"
+        echo "  Error: $response"
+        return 1
+    elif echo "$response" | grep -qi "ReadTimeout\|read timeout"; then
+        print_error "Function timed out (read timeout)"
+        echo "  Error: $response"
+        return 1
     fi
     
     local end_time=$(date +%s)
