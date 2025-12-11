@@ -136,7 +136,15 @@ Return ONLY valid JSON, no additional text."""
         if opportunities:
             prompt_parts.append("\nOpen Opportunities:")
             for opp in opportunities:
-                prompt_parts.append(f"- {opp.get('name', 'N/A')}: ${opp.get('amount', 0):,.0f}")
+                raw_amount = opp.get("amount")
+                amount_display = "N/A"
+                if raw_amount not in (None, ""):
+                    try:
+                        amount_value = float(raw_amount)
+                        amount_display = f"${amount_value:,.0f}"
+                    except (TypeError, ValueError):
+                        amount_display = "N/A"
+                prompt_parts.append(f"- {opp.get('name', 'N/A')}: {amount_display}")
                 prompt_parts.append(f"  Stage: {opp.get('stage', 'N/A')}")
                 prompt_parts.append(f"  Probability: {opp.get('probability', 0)}%")
         
