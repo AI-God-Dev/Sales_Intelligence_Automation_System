@@ -98,14 +98,24 @@ Return ONLY valid JSON, no additional text."""
     def _build_scoring_prompt(self, account_data: Dict[str, Any]) -> str:
         """Build prompt from account data."""
         prompt_parts = []
+
+        def format_currency(value: Any) -> str:
+            """Safely format currency-like values; fall back to N/A."""
+            if value in (None, ""):
+                return "N/A"
+            try:
+                numeric_value = float(value)
+                return f"${numeric_value:,.0f}"
+            except (TypeError, ValueError):
+                return "N/A"
         
         # Account info
         if account_data.get("account_name"):
             prompt_parts.append(f"Account: {account_data['account_name']}")
         if account_data.get("industry"):
             prompt_parts.append(f"Industry: {account_data['industry']}")
-        if account_data.get("annual_revenue"):
-            prompt_parts.append(f"Annual Revenue: ${account_data['annual_revenue']:,.0f}")
+        if account_data.get("annual_revenue") not in (None, ""):
+            prompt_parts.append(f"Annual Revenue: {format_currency(account_data.get('annual_revenue'))}")
         
         # Recent emails
         emails = account_data.get("emails", [])
@@ -136,14 +146,7 @@ Return ONLY valid JSON, no additional text."""
         if opportunities:
             prompt_parts.append("\nOpen Opportunities:")
             for opp in opportunities:
-                raw_amount = opp.get("amount")
-                amount_display = "N/A"
-                if raw_amount not in (None, ""):
-                    try:
-                        amount_value = float(raw_amount)
-                        amount_display = f"${amount_value:,.0f}"
-                    except (TypeError, ValueError):
-                        amount_display = "N/A"
+                amount_display = format_currency(opp.get("amount"))
                 prompt_parts.append(f"- {opp.get('name', 'N/A')}: {amount_display}")
                 prompt_parts.append(f"  Stage: {opp.get('stage', 'N/A')}")
                 prompt_parts.append(f"  Probability: {opp.get('probability', 0)}%")
