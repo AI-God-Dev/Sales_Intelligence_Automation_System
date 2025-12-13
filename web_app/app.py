@@ -397,6 +397,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Inject CSS on page load
+inject_custom_css()
+
 # Configuration
 PROJECT_ID = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
 REGION = os.getenv("GCP_REGION", "us-central1")
