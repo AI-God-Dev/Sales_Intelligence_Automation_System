@@ -331,6 +331,6 @@ FROM `maharani-sales-hub-11-2025.sales_intelligence.gmail_participants` p
 JOIN `maharani-sales-hub-11-2025.sales_intelligence.gmail_messages` m ON p.message_id = m.message_id
 WHERE p.sf_contact_id IS NULL
   AND p.role = 'from'
-  AND m.sent_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+  AND m.sent_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
 ORDER BY m.sent_at DESC;
 

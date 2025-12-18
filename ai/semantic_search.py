@@ -90,7 +90,7 @@ class BigQuerySemanticSearchProvider(SemanticSearchProvider):
             ON p.sf_account_id = a.account_id
         WHERE m.embedding IS NOT NULL
           AND ARRAY_LENGTH(m.embedding) > 0
-          AND m.sent_at >= DATE_SUB(CURRENT_DATE(), INTERVAL @days_back DAY)
+          AND m.sent_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days_back DAY)
           AND (1 - COSINE_DISTANCE(m.embedding, query_embedding.embedding)) >= @min_similarity
         ORDER BY similarity DESC
         LIMIT @limit
@@ -151,7 +151,7 @@ class BigQuerySemanticSearchProvider(SemanticSearchProvider):
             ON c.matched_account_id = a.account_id
         WHERE c.embedding IS NOT NULL
           AND ARRAY_LENGTH(c.embedding) > 0
-          AND c.call_time >= DATE_SUB(CURRENT_DATE(), INTERVAL @days_back DAY)
+          AND c.call_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days_back DAY)
           AND (1 - COSINE_DISTANCE(c.embedding, query_embedding.embedding)) >= @min_similarity
         ORDER BY similarity DESC
         LIMIT @limit

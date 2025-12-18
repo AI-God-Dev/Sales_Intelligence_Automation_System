@@ -46,7 +46,7 @@ class LeadCreator:
           ON p.message_id = m.message_id
         WHERE p.sf_contact_id IS NULL
           AND p.role = 'from'
-          AND m.sent_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
+          AND m.sent_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
           AND p.email_address NOT LIKE '%maharaniweddings.com'
           AND p.email_address NOT LIKE '%noreply%'
           AND p.email_address NOT LIKE '%no-reply%'

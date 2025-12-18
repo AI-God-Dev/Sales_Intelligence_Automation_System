@@ -104,7 +104,7 @@ class EmailReplyGenerator:
         JOIN `{self.bq_client.project_id}.{self.bq_client.dataset_id}.gmail_participants` p
           ON m.message_id = p.message_id
         WHERE p.email_address = @email
-          AND m.sent_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+          AND m.sent_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
         ORDER BY m.sent_at DESC
         LIMIT {limit}
         """
