@@ -30,7 +30,7 @@ $functions = @(
         Memory = "1024MB"
         Timeout = "540s"
         MaxInstances = 5
-        EnvVars = "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai,EMBEDDING_PROVIDER=vertex_ai"
+        EnvVars = "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai,LLM_MODEL=gemini-2.5-pro,EMBEDDING_PROVIDER=vertex_ai"
     },
     @{
         Name = "account-scoring"
@@ -38,7 +38,7 @@ $functions = @(
         Memory = "2048MB"
         Timeout = "540s"
         MaxInstances = 3
-        EnvVars = "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai"
+        EnvVars = "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai,LLM_MODEL=gemini-2.5-pro"
     },
     @{
         Name = "nlp-query"
@@ -46,7 +46,7 @@ $functions = @(
         Memory = "1024MB"
         Timeout = "60s"
         MaxInstances = 10
-        EnvVars = "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai"
+        EnvVars = "GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,LLM_PROVIDER=vertex_ai,LLM_MODEL=gemini-2.5-pro"
     },
     @{
         Name = "create-leads"

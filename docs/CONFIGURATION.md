@@ -25,7 +25,7 @@ SALESFORCE_DOMAIN=test
 
 # LLM Configuration (Vertex-only)
 LLM_PROVIDER=vertex_ai
-LLM_MODEL=gemini-1.5-pro
+LLM_MODEL=gemini-2.5-pro
 EMBEDDING_MODEL=textembedding-gecko@001
 ```
 

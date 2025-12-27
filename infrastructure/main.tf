@@ -42,6 +42,7 @@ resource "google_project_service" "required_apis" {
     "pubsub.googleapis.com",
     "iam.googleapis.com",
     "gmail.googleapis.com",
+    "aiplatform.googleapis.com",  # Vertex AI API
   ])
 
   project = var.project_id
@@ -127,6 +128,20 @@ resource "google_project_iam_member" "cloud_functions_invoker" {
 resource "google_project_iam_member" "run_invoker" {
   project = var.project_id
   role    = "roles/run.invoker"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
+}
+
+# Grant Vertex AI User role for AI/ML operations
+resource "google_project_iam_member" "aiplatform_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
+}
+
+# Grant BigQuery Job User role for query execution
+resource "google_project_iam_member" "bigquery_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${data.google_service_account.existing_sa.email}"
 }
 

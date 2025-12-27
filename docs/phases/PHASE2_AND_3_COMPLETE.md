@@ -291,7 +291,7 @@ BQ_DATASET_NAME=sales_intelligence  # override to sales_intelligence_dev in clie
 
 # LLM Configuration (Vertex-only)
 LLM_PROVIDER=vertex_ai
-LLM_MODEL=gemini-1.5-pro
+LLM_MODEL=gemini-2.5-pro
 EMBEDDING_PROVIDER=vertex_ai
 EMBEDDING_MODEL=textembedding-gecko@001
 ```

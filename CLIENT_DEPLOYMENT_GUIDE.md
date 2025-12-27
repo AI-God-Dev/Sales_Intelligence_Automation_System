@@ -33,5 +33,5 @@ gcloud functions deploy <service-name> \
 ## Notes
 - Do **not** use module paths (e.g., `cloud_functions.gmail_sync.main.gmail_sync`) on Gen2.
 - BigQuery dataset must come from `BQ_DATASET_NAME` (`sales_intelligence` or `sales_intelligence_dev`).
-- AI: Vertex-only (`gemini-1.5-pro/flash`, `textembedding-gecko@001`) via ADC; no OpenAI/Anthropic keys.
+- AI: Vertex-only (`gemini-2.5-pro/flash`, `textembedding-gecko@001`) via ADC; no OpenAI/Anthropic keys.
 - Health checks: ensure `main.py` exists at repo root; functions-framework local run uses `--target=gmail_sync`.

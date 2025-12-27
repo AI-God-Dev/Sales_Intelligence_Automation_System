@@ -28,7 +28,7 @@ ai/
 **VERTEX AI ONLY** - OpenAI and Anthropic have been completely removed.
 
 1. **Vertex AI** (Production - THE ONLY PERMITTED AI ENGINE)
-   - Models: `gemini-1.5-pro` (default), `gemini-1.5-flash` (fast)
+   - Models: `gemini-2.5-pro` (default), `gemini-1.5-flash` (fast)
    - Embeddings: `textembedding-gecko@001` (768 dimensions)
    - Authentication: Application Default Credentials (ADC) - no API keys needed
    - Uses GCP service account for authentication
@@ -54,7 +54,7 @@ ai/
 LLM_PROVIDER=vertex_ai
 
 # LLM Model (Vertex AI Gemini models only)
-LLM_MODEL=gemini-1.5-pro
+LLM_MODEL=gemini-2.5-pro
 
 # Embedding Provider (vertex_ai, local, or mock)
 EMBEDDING_PROVIDER=vertex_ai

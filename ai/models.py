@@ -80,7 +80,7 @@ class MockModelProvider(ModelProvider):
 class VertexAIModelProvider(ModelProvider):
     """Vertex AI (Gemini) model provider - THE ONLY PERMITTED AI ENGINE."""
     
-    def __init__(self, project_id: str, region: str, model_name: str = "gemini-1.5-pro-002"):
+    def __init__(self, project_id: str, region: str, model_name: str = "gemini-2.5-pro"):
         if not VERTEX_AI_AVAILABLE:
             raise ImportError("vertexai package not installed. Install with: pip install google-cloud-aiplatform")
         
@@ -178,7 +178,7 @@ def get_model_provider(
         provider: 'vertex_ai' or 'mock' (default: 'vertex_ai')
         project_id: GCP project ID (required for Vertex AI, uses ADC for auth)
         region: GCP region (required for Vertex AI, default: 'us-central1')
-        model_name: Model name to use (default: 'gemini-1.5-pro')
+        model_name: Model name to use (default: 'gemini-2.5-pro')
         api_key: DEPRECATED - ignored (Vertex AI uses Application Default Credentials)
     
     Returns:
@@ -200,7 +200,7 @@ def get_model_provider(
         provider = "vertex_ai"
     
     if not model_name:
-        model_name = os.getenv("LLM_MODEL", "gemini-1.5-pro-002").strip()
+        model_name = os.getenv("LLM_MODEL", "gemini-2.5-pro").strip()
     
     if provider == "mock":
         return MockModelProvider()

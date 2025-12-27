@@ -160,7 +160,7 @@ class Settings(BaseSettings):
     # LLM Configuration
     # Vertex AI ONLY - uses Application Default Credentials (ADC) for authentication
     llm_provider: str = os.getenv("LLM_PROVIDER", "vertex_ai")  # Only 'vertex_ai' or 'mock' supported
-    llm_model: str = os.getenv("LLM_MODEL", "gemini-1.5-pro")  # Vertex AI: gemini-1.5-pro, gemini-1.5-flash
+    llm_model: str = os.getenv("LLM_MODEL", "gemini-2.5-pro")  # Vertex AI: gemini-2.5-pro, gemini-1.5-flash
     embedding_provider: str = os.getenv("EMBEDDING_PROVIDER", "vertex_ai")  # Only 'vertex_ai', 'local', or 'mock' supported
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "textembedding-gecko@001")  # Vertex AI: textembedding-gecko@001
     

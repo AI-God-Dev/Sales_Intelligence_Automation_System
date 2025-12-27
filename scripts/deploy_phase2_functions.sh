@@ -31,7 +31,7 @@ gcloud functions deploy generate-embeddings \
   --timeout=540s \
   --max-instances=5 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai,EMBEDDING_PROVIDER=vertex_ai" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai,LLM_MODEL=gemini-2.5-pro,EMBEDDING_PROVIDER=vertex_ai" \
   --project=$PROJECT_ID
 
 # Deploy Account Scoring Function
@@ -48,7 +48,7 @@ gcloud functions deploy account-scoring \
   --timeout=540s \
   --max-instances=3 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai,LLM_MODEL=gemini-2.5-pro" \
   --project=$PROJECT_ID
 
 # Deploy NLP Query Function
@@ -65,7 +65,7 @@ gcloud functions deploy nlp-query \
   --timeout=60s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai,LLM_MODEL=gemini-2.5-pro" \
   --project=$PROJECT_ID
 
 # Deploy Lead Creation Function
@@ -133,7 +133,7 @@ gcloud functions deploy generate-email-reply \
   --timeout=120s \
   --max-instances=10 \
   --min-instances=0 \
-  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai" \
+  --set-env-vars="GCP_PROJECT_ID=$PROJECT_ID,GCP_REGION=$REGION,BQ_DATASET_NAME=$DATASET_NAME,LLM_PROVIDER=vertex_ai,LLM_MODEL=gemini-2.5-pro" \
   --project=$PROJECT_ID
 
 # Deploy Semantic Search Function

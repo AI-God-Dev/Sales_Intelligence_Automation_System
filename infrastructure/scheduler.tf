@@ -265,3 +265,77 @@ resource "google_cloud_scheduler_job" "entity_resolution" {
   depends_on = [google_project_service.required_apis]
 }
 
+# Account Scoring Job (runs daily at 7 AM - before 8 AM target)
+resource "google_cloud_scheduler_job" "account_scoring_daily" {
+  name             = "account-scoring-daily"
+  description      = "Daily account scoring using AI - runs at 7 AM"
+  schedule         = "0 7 * * *" # Daily at 7 AM
+  time_zone        = "America/New_York"
+  region           = var.region
+  project          = var.project_id
+  
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-${var.project_id}.cloudfunctions.net/account-scoring"
+    
+    headers = {
+      "Content-Type" = "application/json"
+    }
+    
+    body = base64encode(jsonencode({
+      # No limit - score all accounts
+    }))
+    
+    oidc_token {
+      service_account_email = data.google_service_account.existing_sa.email
+    }
+  }
+  
+  retry_config {
+    retry_count = 2
+    max_retry_duration = "1200s"  # 20 minutes - increased for AI processing
+    min_backoff_duration = "10s"
+    max_backoff_duration = "300s"
+    max_doublings = 3
+  }
+  
+  depends_on = [google_project_service.required_apis]
+}
+
+# Embeddings Generation Job (runs daily at 8 AM - after scoring)
+resource "google_cloud_scheduler_job" "generate_embeddings_daily" {
+  name             = "generate-embeddings-daily"
+  description      = "Daily embeddings generation for semantic search - runs at 8 AM"
+  schedule         = "0 8 * * *" # Daily at 8 AM
+  time_zone        = "America/New_York"
+  region           = var.region
+  project          = var.project_id
+  
+  http_target {
+    http_method = "POST"
+    uri         = "https://${var.region}-${var.project_id}.cloudfunctions.net/generate-embeddings"
+    
+    headers = {
+      "Content-Type" = "application/json"
+    }
+    
+    body = base64encode(jsonencode({
+      # Generate embeddings for all new content
+    }))
+    
+    oidc_token {
+      service_account_email = data.google_service_account.existing_sa.email
+    }
+  }
+  
+  retry_config {
+    retry_count = 2
+    max_retry_duration = "1200s"  # 20 minutes - increased for AI processing
+    min_backoff_duration = "10s"
+    max_backoff_duration = "300s"
+    max_doublings = 3
+  }
+  
+  depends_on = [google_project_service.required_apis]
+}
+
