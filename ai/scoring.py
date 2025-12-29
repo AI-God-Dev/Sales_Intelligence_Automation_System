@@ -1,172 +1,207 @@
 """
-Unified Scoring Provider
-Provides account scoring capabilities using LLM analysis.
+Scoring provider abstraction.
+
+Important:
+- DOES NOT pass response_schema to Vertex GenerationConfig (avoids protobuf Schema errors)
+- Supports call sites that pass bq_client=... into get_scoring_provider()
+- Uses safe date/datetime serialization for JSON encoding
+
+Public exports:
+- ScoringProvider (Protocol)
+- VertexAIScoringProvider (implementation)
+- get_scoring_provider (factory)
 """
-import logging
+from __future__ import annotations
+
 import json
-from typing import Dict, Any, Optional, List
-from abc import ABC, abstractmethod
-from ai.models import get_model_provider, ModelProvider
-from utils.bigquery_client import BigQueryClient
+import logging
+import os
+from dataclasses import dataclass
+from datetime import date, datetime
+from typing import Any, Dict, Optional, Protocol
+
+from ai.models import ModelProvider, get_model_provider
 
 logger = logging.getLogger(__name__)
 
 
-class ScoringProvider(ABC):
-    """Abstract base class for scoring providers."""
+def _json_serializer(obj: Any) -> str:
+    """
+    Custom JSON serializer for objects that aren't serializable by default.
+    Handles date, datetime, and other common types.
     
-    @abstractmethod
-    def score_account(self, account_id: str, account_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Score an account based on aggregated data."""
-        pass
-
-
-class LLMScoringProvider(ScoringProvider):
-    """LLM-based account scoring provider."""
-    
-    def __init__(
-        self,
-        model_provider: Optional[ModelProvider] = None,
-        bq_client: Optional[BigQueryClient] = None
-    ):
-        self.model_provider = model_provider or get_model_provider()
-        self.bq_client = bq_client or BigQueryClient()
-        # Store project_id and dataset_id for convenience
-        self.project_id = self.bq_client.project_id
-        self.dataset_id = self.bq_client.dataset_id
-    
-    def score_account(self, account_id: str, account_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Score account using LLM analysis."""
-        # Build prompt from account data
-        prompt = self._build_scoring_prompt(account_data)
+    Args:
+        obj: Object to serialize
         
-        system_prompt = """You are an expert sales analyst. Analyze the provided account data and generate a JSON response with:
-- priority_score: integer 0-100 (overall priority)
-- budget_likelihood: integer 0-100 (likelihood discussing 2026 budget)
-- engagement_score: integer 0-100 (recent engagement level)
-- reasoning: string (explanation of scores)
-- recommended_action: string (suggested next step)
-- key_signals: array of strings (detected buying signals)
+    Returns:
+        String representation of the object
+    """
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    if hasattr(obj, '__dict__'):
+        return str(obj)
+    return str(obj)
 
-Return ONLY valid JSON, no additional text."""
-        
-        try:
-            # Use Vertex AI Gemini's structured JSON output capability
-            response = self.model_provider.generate(
-                prompt,
-                system_prompt=system_prompt,
-                max_tokens=2000,
-                temperature=0.3  # Lower temperature for more consistent JSON output
-            )
-            
-            # Parse JSON response
-            # Sometimes LLM wraps JSON in markdown code blocks
-            response = response.strip()
-            if response.startswith("```"):
-                # Extract JSON from code block
-                lines = response.split("\n")
-                json_lines = [l for l in lines if not l.strip().startswith("```")]
-                response = "\n".join(json_lines)
-            
-            score_data = json.loads(response)
-            
-            # Validate and normalize scores
-            return {
-                "priority_score": min(100, max(0, int(score_data.get("priority_score", 50)))),
-                "budget_likelihood": min(100, max(0, int(score_data.get("budget_likelihood", 50)))),
-                "engagement_score": min(100, max(0, int(score_data.get("engagement_score", 50)))),
-                "reasoning": str(score_data.get("reasoning", "")),
-                "recommended_action": str(score_data.get("recommended_action", "")),
-                "key_signals": list(score_data.get("key_signals", []))
-            }
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM scoring response: {e}")
-            logger.error(f"Response was: {response}")
-            # Return default scores
-            return {
-                "priority_score": 50,
-                "budget_likelihood": 50,
-                "engagement_score": 50,
-                "reasoning": "Error parsing LLM response",
-                "recommended_action": "Review account manually",
-                "key_signals": []
-            }
-        except Exception as e:
-            logger.error(f"Error in account scoring: {e}", exc_info=True)
-            raise
-    
-    def _build_scoring_prompt(self, account_data: Dict[str, Any]) -> str:
-        """Build prompt from account data."""
-        prompt_parts = []
 
-        def format_currency(value: Any) -> str:
-            """Safely format currency-like values; fall back to N/A."""
-            if value in (None, ""):
-                return "N/A"
+class ScoringProvider(Protocol):
+    """Interface expected by AccountScorer / scoring pipeline."""
+
+    def score_account(self, account_id: str, account_data: Dict[str, Any]) -> Dict[str, Any]:
+        raise NotImplementedError
+
+
+def _safe_json_loads(text: str) -> Dict[str, Any]:
+    """
+    Best-effort JSON parsing:
+    - Strips common Markdown fences
+    - Attempts strict JSON parse
+    - Falls back to minimal structured payload on failure
+    """
+    if not isinstance(text, str):
+        return {"raw": str(text)}
+
+    cleaned = text.strip()
+
+    # Remove ```json ... ``` or ``` ... ```
+    if cleaned.startswith("```"):
+        cleaned = cleaned.strip("`")
+        # If it started with json\n, remove the first line
+        cleaned = cleaned.replace("json\n", "", 1).strip()
+
+    # Try strict JSON
+    try:
+        obj = json.loads(cleaned)
+        if isinstance(obj, dict):
+            return obj
+        return {"value": obj}
+    except Exception:
+        # Try extracting first {...} block
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end != -1 and end > start:
             try:
-                numeric_value = float(value)
-                return f"${numeric_value:,.0f}"
-            except (TypeError, ValueError):
-                return "N/A"
+                obj = json.loads(cleaned[start : end + 1])
+                if isinstance(obj, dict):
+                    return obj
+                return {"value": obj}
+            except Exception:
+                pass
+
+    return {"raw": text, "parse_error": True}
+
+
+@dataclass
+class VertexAIScoringProvider:
+    """
+    Scoring provider that uses an LLM (Vertex/Gemini via ModelProvider) to produce scoring JSON.
+    
+    bq_client is accepted for compatibility with current wiring but is not required here.
+    If later you want this provider to query BigQuery directly, you can use self.bq_client.
+    """
+
+    model_provider: ModelProvider
+    bq_client: Any = None  # optional, for compatibility / future use
+
+    def score_account(self, account_id: str, account_data: Dict[str, Any]) -> Dict[str, Any]:
+        prompt = self._build_prompt(account_id, account_data)
+
+        # Request JSON output without passing response_schema (Vertex SDK schema is not full JSON Schema).
+        response_text = self.model_provider.generate(
+            prompt,
+            want_json=True,
+            temperature=0.2,
+            max_output_tokens=1200,
+        )
+
+        payload = _safe_json_loads(response_text)
+
+        # Normalize minimal expected fields (do not hard-fail if missing)
+        payload.setdefault("account_id", account_id)
         
-        # Account info
-        if account_data.get("account_name"):
-            prompt_parts.append(f"Account: {account_data['account_name']}")
-        if account_data.get("industry"):
-            prompt_parts.append(f"Industry: {account_data['industry']}")
-        if account_data.get("annual_revenue") not in (None, ""):
-            prompt_parts.append(f"Annual Revenue: {format_currency(account_data.get('annual_revenue'))}")
+        # Ensure required fields for compatibility with account_scorer.py
+        payload.setdefault("priority_score", payload.get("score", 50))
+        payload.setdefault("budget_likelihood", 50)
+        payload.setdefault("engagement_score", 50)
+        payload.setdefault("reasoning", payload.get("recommendation", ""))
+        payload.setdefault("recommended_action", "")
+        payload.setdefault("key_signals", payload.get("reasons", []))
         
-        # Recent emails
-        emails = account_data.get("emails", [])
-        if emails:
-            prompt_parts.append("\nRecent Emails:")
-            for email in emails[:5]:
-                prompt_parts.append(f"- Subject: {email.get('subject', 'N/A')}")
-                prompt_parts.append(f"  From: {email.get('from_email', 'N/A')}")
-                prompt_parts.append(f"  Date: {email.get('sent_at', 'N/A')}")
-                body_preview = (email.get('body_text', '') or '')[:200]
-                if body_preview:
-                    prompt_parts.append(f"  Preview: {body_preview}...")
+        return payload
+
+    def _build_prompt(self, account_id: str, account_data: Dict[str, Any]) -> str:
+        """
+        Prompt tuned to force clean JSON. Keep the schema requirements inside the prompt text
+        (rather than response_schema) to avoid Vertex Schema protobuf failures.
         
-        # Recent calls
-        calls = account_data.get("calls", [])
-        if calls:
-            prompt_parts.append("\nRecent Calls:")
-            for call in calls[:3]:
-                prompt_parts.append(f"- Date: {call.get('call_time', 'N/A')}")
-                prompt_parts.append(f"  Direction: {call.get('direction', 'N/A')}")
-                prompt_parts.append(f"  Sentiment: {call.get('sentiment_score', 'N/A')}")
-                transcript_preview = (call.get('transcript_text', '') or '')[:200]
-                if transcript_preview:
-                    prompt_parts.append(f"  Preview: {transcript_preview}...")
-        
-        # Opportunities
-        opportunities = account_data.get("opportunities", [])
-        if opportunities:
-            prompt_parts.append("\nOpen Opportunities:")
-            for opp in opportunities:
-                amount_display = format_currency(opp.get("amount"))
-                prompt_parts.append(f"- {opp.get('name', 'N/A')}: {amount_display}")
-                prompt_parts.append(f"  Stage: {opp.get('stage', 'N/A')}")
-                prompt_parts.append(f"  Probability: {opp.get('probability', 0)}%")
-        
-        # Activities
-        activities = account_data.get("activities", [])
-        if activities:
-            prompt_parts.append("\nRecent Activities:")
-            for activity in activities[:5]:
-                prompt_parts.append(f"- {activity.get('activity_type', 'N/A')}: {activity.get('subject', 'N/A')}")
-                prompt_parts.append(f"  Date: {activity.get('activity_date', 'N/A')}")
-        
-        prompt_parts.append("\nAnalyze this account and provide scores based on engagement, budget signals, and buying intent.")
-        
-        return "\n".join(prompt_parts)
+        FIXED: Uses custom JSON serializer to handle date/datetime objects safely.
+        """
+        # Serialize account_data with safe date handling
+        try:
+            account_json = json.dumps(account_data, default=_json_serializer, ensure_ascii=False)
+        except Exception as e:
+            logger.warning(f"Failed to serialize account_data for {account_id}: {e}")
+            # Fallback: convert to string representation
+            account_json = str(account_data)
+
+        return f"""
+You are a sales intelligence scoring assistant.
+
+Return ONLY valid JSON (no markdown, no code fences, no commentary).
+
+JSON requirements:
+- Must be a single JSON object.
+- Use double quotes for all keys/strings.
+- Provide these top-level keys:
+  - "score" (number 0-100)
+  - "tier" (string: "A" | "B" | "C" | "D")
+  - "recommendation" (short string)
+  - "reasons" (array of 3-6 short strings)
+  - "next_steps" (array of 3-6 short strings)
+  - "risks" (array of 0-5 short strings)
+  - "confidence" (number 0-1)
+
+Context:
+account_id: {account_id}
+account_data: {account_json}
+""".strip()
 
 
 def get_scoring_provider(
+    provider: Optional[str] = None,
+    *,
+    llm_provider: Optional[str] = None,
     model_provider: Optional[ModelProvider] = None,
-    bq_client: Optional[BigQueryClient] = None
+    bq_client: Any = None,
+    **kwargs: Any,
 ) -> ScoringProvider:
-    """Factory function to get scoring provider."""
-    return LLMScoringProvider(model_provider, bq_client)
+    """
+    Factory that returns a ScoringProvider.
+    
+    Compatibility:
+    - Accepts bq_client=... (previous wiring)
+    - Accepts arbitrary **kwargs to avoid breaking older call sites
+    
+    Provider resolution:
+    - provider arg wins
+    - else llm_provider
+    - else env LLM_PROVIDER
+    - default "vertex_ai"
+    """
+    provider_name = (provider or llm_provider or os.getenv("LLM_PROVIDER") or "vertex_ai").strip().lower()
+
+    if model_provider is None:
+        # get_model_provider supports provider=... in our patched ai/models.py
+        model_provider = get_model_provider(provider=provider_name)
+
+    if provider_name in ("vertex", "vertex_ai", "vertexai", "google", "gemini"):
+        return VertexAIScoringProvider(model_provider=model_provider, bq_client=bq_client)
+
+    # If you later add other scoring providers, branch here.
+    raise ValueError(f"Unsupported scoring provider: {provider_name!r}")
+
+
+__all__ = [
+    "ScoringProvider",
+    "VertexAIScoringProvider",
+    "get_scoring_provider",
+]

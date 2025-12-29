@@ -1,216 +1,240 @@
 """
-Unified Model Provider Interface
-Abstracts LLM calls using Vertex AI only (with mock mode for testing).
+Model provider abstraction layer.
+
+Key behaviors:
+- Supports Vertex AI (Gemini) as the default provider.
+- If want_json is requested, we set response_mime_type="application/json"
+- We DO NOT pass response_schema into GenerationConfig because Vertex SDK Schema is not full JSON Schema
+  (passing arbitrary JSON Schema frequently causes protobuf Schema parse errors like "additionalProperties").
+
+Supported kwargs (common):
+  - want_json: bool
+  - temperature: float
+  - max_output_tokens: int
+  - top_p: float
+  - top_k: int
+  - response_schema: (ignored for Vertex; logged)
+  - system_instruction / system_prompt: str (best-effort; Vertex)
 """
-import os
+from __future__ import annotations
+
+import abc
+import json
 import logging
-from typing import Optional, Dict, Any, List
-from abc import ABC, abstractmethod
-import warnings
+import os
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Protocol, Union
 
 logger = logging.getLogger(__name__)
 
-# Suppress warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="google.cloud.aiplatform")
-warnings.filterwarnings("ignore", message=".*pkg_resources.*deprecated.*")
 
-# Vertex AI imports
-try:
-    from google.cloud import aiplatform
-    from vertexai.generative_models import GenerativeModel
-    from vertexai import init as vertex_init
-    VERTEX_AI_AVAILABLE = True
-except ImportError:
-    VERTEX_AI_AVAILABLE = False
+class ModelProvider(Protocol):
+    """Simple interface expected by the rest of the app."""
+
+    def generate(self, prompt: str, **kwargs: Any) -> str:
+        """Generate a text response from a prompt."""
+        raise NotImplementedError
 
 
-class ModelProvider(ABC):
-    """Abstract base class for model providers."""
-    
-    @abstractmethod
-    def generate(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
-        """Generate text from prompt."""
-        pass
-    
-    @abstractmethod
-    def generate_stream(self, prompt: str, system_prompt: str = "", **kwargs):
-        """Generate text stream from prompt."""
-        pass
-
-
-class MockModelProvider(ModelProvider):
-    """Mock model provider for testing and local development.
-    
-    Simulates Vertex AI Gemini behavior for MOCK_MODE.
-    Returns deterministic responses based on prompt content.
+@dataclass
+class VertexAIModelProvider:
     """
-    
-    def generate(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
-        """Return mock response simulating Vertex AI Gemini output."""
-        # Simulate Vertex AI JSON output for scoring
-        if "score" in prompt.lower() or "scoring" in prompt.lower() or "priority_score" in prompt.lower():
-            return """{
-  "priority_score": 75,
-  "budget_likelihood": 60,
-  "engagement_score": 80,
-  "reasoning": "Mock reasoning: Account shows moderate engagement with recent email activity. Simulated Vertex AI Gemini response.",
-  "recommended_action": "Follow up with pricing discussion",
-  "key_signals": ["Recent email exchange", "Budget discussion mentioned"]
-}"""
-        # Simulate Vertex AI summary output
-        elif "summary" in prompt.lower() or "summarize" in prompt.lower():
-            return "Mock summary: This is a placeholder summary generated in MOCK_MODE, simulating Vertex AI Gemini output."
-        # Simulate Vertex AI insight output
-        elif "insight" in prompt.lower() or "analyze" in prompt.lower():
-            return "Mock insight: Account shows positive engagement signals. Simulated Vertex AI Gemini analysis."
-        # Simulate Vertex AI SQL generation
-        elif "sql" in prompt.lower() or "query" in prompt.lower() or "SELECT" in prompt.upper():
-            return "SELECT * FROM `{project_id}.{dataset_id}.gmail_messages` LIMIT 10"
-        # Default mock response
-        else:
-            return "Mock response: This is a placeholder response generated in MOCK_MODE, simulating Vertex AI Gemini behavior."
-    
-    def generate_stream(self, prompt: str, system_prompt: str = "", **kwargs):
-        """Return mock stream."""
-        response = self.generate(prompt, system_prompt, **kwargs)
-        for word in response.split():
-            yield word + " "
+    Vertex AI (Gemini) provider.
 
+    Notes:
+    - Imports vertexai lazily to avoid import-time failures breaking container startup.
+    - Uses response_mime_type="application/json" when want_json is requested.
+    - Ignores response_schema to avoid protobuf Schema errors.
+    """
 
-class VertexAIModelProvider(ModelProvider):
-    """Vertex AI (Gemini) model provider - THE ONLY PERMITTED AI ENGINE."""
-    
-    def __init__(self, project_id: str, region: str, model_name: str = "gemini-2.5-pro"):
-        if not VERTEX_AI_AVAILABLE:
-            raise ImportError("vertexai package not installed. Install with: pip install google-cloud-aiplatform")
-        
+    project_id: Optional[str] = None
+    region: Optional[str] = None
+    model_name: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        self.project_id = self.project_id or os.getenv("GCP_PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT")
+        self.region = self.region or os.getenv("GCP_REGION") or os.getenv("GOOGLE_CLOUD_REGION") or "us-central1"
+        self.model_name = self.model_name or os.getenv("LLM_MODEL") or os.getenv("VERTEX_MODEL") or os.getenv("VERTEX_MODEL_NAME") or "gemini-2.5-pro"
+
+        # Initialize Vertex lazily but at provider init time (still safe).
         try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning)
-                warnings.filterwarnings("ignore", message=".*pkg_resources.*")
-                # Initialize Vertex AI with Application Default Credentials (ADC)
-                vertex_init(project=project_id, location=region)
-                aiplatform.init(project=project_id, location=region)
-            
-            self.model = GenerativeModel(model_name)
-            self.model_name = model_name
-            self.project_id = project_id
-            self.region = region
+            import vertexai  # type: ignore
+
+            vertexai.init(project=self.project_id, location=self.region)
         except Exception as e:
-            logger.error(f"Failed to initialize Vertex AI: {e}")
-            raise ValueError(f"Vertex AI initialization failed: {e}")
-    
-    def generate(self, prompt: str, system_prompt: str = "", **kwargs) -> str:
-        """Generate text using Vertex AI Gemini models."""
+            # Do not raise here; raise only when generating to help container start and show clearer errors.
+            logger.warning("Vertex AI init did not complete at provider init time: %s", e)
+
+    def generate(self, prompt: str, **kwargs: Any) -> str:
         try:
-            # Combine system prompt and user prompt
-            full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-            
-            # Handle generation config
-            from vertexai.generative_models import GenerationConfig
-            generation_config = None
-            
-            config_params = {}
-            if "max_tokens" in kwargs:
-                config_params["max_output_tokens"] = kwargs["max_tokens"]
-            if "temperature" in kwargs:
-                config_params["temperature"] = kwargs.get("temperature", 0.7)
-            
-            # Handle response_schema for structured JSON output (Gemini feature)
-            if "response_schema" in kwargs:
-                config_params["response_schema"] = kwargs["response_schema"]
-            
-            if config_params:
-                generation_config = GenerationConfig(**config_params)
-            
-            # Generate content
-            if generation_config:
-                response = self.model.generate_content(
-                    full_prompt,
-                    generation_config=generation_config
-                )
+            from vertexai.generative_models import (  # type: ignore
+                GenerationConfig,
+                GenerativeModel,
+            )
+        except Exception as e:
+            raise RuntimeError(f"Vertex AI SDK import failed: {e}") from e
+
+        system_instruction = (
+            kwargs.get("system_instruction")
+            or kwargs.get("system_prompt")
+            or os.getenv("LLM_SYSTEM_INSTRUCTION")
+            or None
+        )
+
+        temperature = kwargs.get("temperature", float(os.getenv("LLM_TEMPERATURE", "0.2")))
+        max_output_tokens = kwargs.get("max_output_tokens", int(os.getenv("LLM_MAX_TOKENS", "1024")))
+        top_p = kwargs.get("top_p", float(os.getenv("LLM_TOP_P", "0.95")))
+        top_k = kwargs.get("top_k", int(os.getenv("LLM_TOP_K", "40")))
+
+        # If caller asked for JSON OR provided response_schema, prefer JSON mime type.
+        want_json = bool(kwargs.get("want_json")) or ("response_schema" in kwargs)
+
+        config_params: Dict[str, Any] = {
+            "temperature": temperature,
+            "max_output_tokens": max_output_tokens,
+            "top_p": top_p,
+            "top_k": top_k,
+        }
+
+        if want_json:
+            config_params["response_mime_type"] = "application/json"
+
+        # IMPORTANT: Do NOT pass response_schema into GenerationConfig.
+        # Vertex SDK expects a proto Schema, not a full JSON Schema; fields like "additionalProperties" break parsing.
+        if "response_schema" in kwargs and kwargs["response_schema"] is not None:
+            logger.info(
+                "Ignoring response_schema for Vertex AI GenerationConfig to avoid protobuf Schema parse errors."
+            )
+
+        generation_config = GenerationConfig(**config_params)
+
+        # Create model (system_instruction is best-effort)
+        try:
+            if system_instruction:
+                model = GenerativeModel(self.model_name, system_instruction=system_instruction)
             else:
-                response = self.model.generate_content(full_prompt)
-            
-            # Handle Vertex AI response format
-            if hasattr(response, 'text'):
-                return response.text
-            elif hasattr(response, 'candidates') and response.candidates:
-                if hasattr(response.candidates[0], 'content') and response.candidates[0].content.parts:
-                    return response.candidates[0].content.parts[0].text
-            else:
-                raise ValueError(f"Unexpected Vertex AI response format: {response}")
-        except Exception as e:
-            logger.error(f"Error calling Vertex AI: {e}", exc_info=True)
-            raise
-    
-    def generate_stream(self, prompt: str, system_prompt: str = "", **kwargs):
-        """Generate streaming text using Vertex AI."""
+                model = GenerativeModel(self.model_name)
+        except TypeError:
+            # Older SDKs may not accept system_instruction; fall back.
+            model = GenerativeModel(self.model_name)
+
         try:
-            full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-            response = self.model.generate_content(full_prompt, stream=True)
-            
-            for chunk in response:
-                if hasattr(chunk, 'text'):
-                    yield chunk.text
-                elif hasattr(chunk, 'candidates') and chunk.candidates:
-                    yield chunk.candidates[0].content.parts[0].text
+            resp = model.generate_content(prompt, generation_config=generation_config)
         except Exception as e:
-            logger.error(f"Error streaming from Vertex AI: {e}", exc_info=True)
+            logger.exception("Error calling Vertex AI generate_content")
             raise
 
+        # Vertex SDK response handling can vary; normalize to string.
+        text = getattr(resp, "text", None)
+        if isinstance(text, str) and text.strip():
+            return text
 
+        # Fallback: attempt to pull text from candidates
+        try:
+            candidates = getattr(resp, "candidates", None) or []
+            if candidates:
+                content = getattr(candidates[0], "content", None)
+                parts = getattr(content, "parts", None) or []
+                if parts:
+                    part0 = parts[0]
+                    part_text = getattr(part0, "text", None)
+                    if isinstance(part_text, str):
+                        return part_text
+        except Exception:
+            pass
+
+        # Last resort
+        return str(resp)
+
+
+@dataclass
+class OpenAIModelProvider:
+    """
+    Optional OpenAI provider (only used if LLM_PROVIDER=openai).
+    Implemented defensively so importing does not break if openai is not installed.
+    """
+
+    api_key: Optional[str] = None
+    model_name: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        self.api_key = self.api_key or os.getenv("OPENAI_API_KEY")
+        self.model_name = self.model_name or os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
+
+    def generate(self, prompt: str, **kwargs: Any) -> str:
+        try:
+            from openai import OpenAI  # type: ignore
+        except Exception as e:
+            raise RuntimeError(f"openai SDK import failed: {e}") from e
+
+        if not self.api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set")
+
+        client = OpenAI(api_key=self.api_key)
+
+        temperature = kwargs.get("temperature", float(os.getenv("LLM_TEMPERATURE", "0.2")))
+        max_output_tokens = kwargs.get("max_output_tokens", int(os.getenv("LLM_MAX_TOKENS", "1024")))
+
+        system_instruction = kwargs.get("system_instruction") or kwargs.get("system_prompt")
+
+        messages = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+
+        resp = client.chat.completions.create(
+            model=self.model_name,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_output_tokens,
+        )
+
+        return resp.choices[0].message.content or ""
 
 
 def get_model_provider(
-    provider: str = None,
-    project_id: str = None,
-    region: str = None,
-    model_name: str = None,
-    api_key: str = None  # Deprecated - kept for backward compatibility but ignored
+    provider: Optional[str] = None,
+    *,
+    llm_provider: Optional[str] = None,
+    **kwargs: Any,
 ) -> ModelProvider:
     """
-    Factory function to get the appropriate model provider.
-    
-    ONLY VERTEX AI IS SUPPORTED. OpenAI and Anthropic have been removed.
-    
-    Args:
-        provider: 'vertex_ai' or 'mock' (default: 'vertex_ai')
-        project_id: GCP project ID (required for Vertex AI, uses ADC for auth)
-        region: GCP region (required for Vertex AI, default: 'us-central1')
-        model_name: Model name to use (default: 'gemini-2.5-pro')
-        api_key: DEPRECATED - ignored (Vertex AI uses Application Default Credentials)
-    
-    Returns:
-        ModelProvider instance (VertexAIModelProvider or MockModelProvider)
+    Factory that returns the configured ModelProvider.
+
+    Backward-compatible argument handling:
+      - provider=... (older call sites)
+      - llm_provider=... (explicit)
+      - env var LLM_PROVIDER (default: vertex_ai)
     """
-    # Check for MOCK_MODE first
-    mock_mode = os.getenv("MOCK_MODE", "0").strip().lower() in ("1", "true", "yes")
-    if mock_mode:
-        logger.info("MOCK_MODE enabled - using MockModelProvider")
-        return MockModelProvider()
-    
-    # Get provider from environment if not specified
-    if not provider:
-        provider = os.getenv("LLM_PROVIDER", "vertex_ai").strip().lower()
-    
-    # Force vertex_ai if anything else is specified (except mock)
-    if provider not in ("vertex_ai", "mock"):
-        logger.warning(f"Provider '{provider}' is not supported. Only 'vertex_ai' and 'mock' are allowed. Using 'vertex_ai'.")
-        provider = "vertex_ai"
-    
-    if not model_name:
-        model_name = os.getenv("LLM_MODEL", "gemini-2.5-pro").strip()
-    
-    if provider == "mock":
-        return MockModelProvider()
-    elif provider == "vertex_ai":
-        if not project_id:
-            project_id = os.getenv("GCP_PROJECT_ID", "").strip()
-        if not region:
-            region = os.getenv("GCP_REGION", "us-central1").strip()
-        if not project_id:
-            raise ValueError("GCP_PROJECT_ID required for Vertex AI provider. Vertex AI uses Application Default Credentials (ADC) for authentication - no API key needed.")
-        return VertexAIModelProvider(project_id, region, model_name)
-    else:
-        raise ValueError(f"Unsupported provider: {provider}. Only 'vertex_ai' and 'mock' are supported.")
+    provider_name = (
+        provider
+        or llm_provider
+        or kwargs.get("provider_name")
+        or os.getenv("LLM_PROVIDER")
+        or "vertex_ai"
+    )
+
+    provider_name = str(provider_name).strip().lower()
+
+    if provider_name in ("vertex", "vertex_ai", "vertexai", "google", "gemini"):
+        return VertexAIModelProvider(
+            project_id=kwargs.get("project_id") or os.getenv("GCP_PROJECT_ID"),
+            region=kwargs.get("region") or os.getenv("GCP_REGION"),
+            model_name=kwargs.get("model_name") or os.getenv("LLM_MODEL") or os.getenv("VERTEX_MODEL") or os.getenv("VERTEX_MODEL_NAME"),
+        )
+
+    if provider_name in ("openai",):
+        return OpenAIModelProvider(
+            api_key=kwargs.get("api_key") or os.getenv("OPENAI_API_KEY"),
+            model_name=kwargs.get("model_name") or os.getenv("OPENAI_MODEL"),
+        )
+
+    raise ValueError(f"Unsupported LLM provider: {provider_name!r}")
+
+
+__all__ = [
+    "ModelProvider",
+    "VertexAIModelProvider",
+    "OpenAIModelProvider",
+    "get_model_provider",
+]
