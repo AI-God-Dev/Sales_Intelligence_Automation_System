@@ -1,0 +1,19 @@
+[
+  {
+    "message_id": "msg-001",
+    "subject": "Budget Discussion for 2026",
+    "body_text": "We are interested in discussing our 2026 budget and would like to schedule a call.",
+    "sent_at": "2025-12-15T10:30:00Z",
+    "from_email": "contact@testcorp.com",
+    "to_email": "sales@example.com"
+  },
+  {
+    "message_id": "msg-002",
+    "subject": "Re: Budget Discussion for 2026",
+    "body_text": "Thank you for your interest. I've attached our pricing information.",
+    "sent_at": "2025-12-16T11:00:00Z",
+    "from_email": "sales@example.com",
+    "to_email": "contact@testcorp.com"
+  }
+]
+

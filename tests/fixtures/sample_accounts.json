@@ -1,0 +1,21 @@
+[
+  {
+    "account_id": "001XX000004ABCD",
+    "account_name": "Test Corporation",
+    "industry": "Technology",
+    "annual_revenue": 1000000,
+    "billing_city": "San Francisco",
+    "billing_state": "CA",
+    "billing_country": "USA"
+  },
+  {
+    "account_id": "001XX000004EFGH",
+    "account_name": "Another Company",
+    "industry": "Healthcare",
+    "annual_revenue": 500000,
+    "billing_city": "New York",
+    "billing_state": "NY",
+    "billing_country": "USA"
+  }
+]
+

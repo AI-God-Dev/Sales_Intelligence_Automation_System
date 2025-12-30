@@ -13,12 +13,12 @@ simple-salesforce==1.12.6
 google-api-python-client==2.108.0
 google-auth-httplib2==0.1.1
 google-auth-oauthlib==1.1.0
-hubspot-api-client==7.0.0
+hubspot-api-client==12.0.0
 requests==2.31.0
 
 # Data Processing
-pandas==2.1.3
-numpy==1.26.2
+pandas==2.3.3
+numpy==2.4.0
 python-dateutil==2.8.2
 phonenumbers==8.13.26
 
@@ -38,7 +38,7 @@ streamlit-authenticator==0.2.3
 # Utilities
 python-dotenv==1.0.0
 pydantic==2.5.2
-pydantic-settings==2.1.0
+pydantic-settings==2.12.0
 tenacity==8.2.3
 
 # Testing
@@ -47,7 +47,7 @@ pytest-cov==4.1.0
 pytest-mock==3.12.0
 
 # Logging & Monitoring
-google-cloud-logging==3.8.0
+google-cloud-logging==3.13.0
 google-cloud-monitoring==2.16.0
 google-cloud-pubsub==2.21.5
 
