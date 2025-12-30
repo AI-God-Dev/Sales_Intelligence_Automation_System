@@ -132,6 +132,54 @@ class MetricsCollector:
         # For simplicity, we'll just log histogram values
         # In production, use proper histogram aggregation
         logger.debug(f"Histogram {metric_name} recorded: {value}")
+    
+    def record_account_scoring_metrics(
+        self,
+        accounts_scored: int,
+        duration_seconds: float,
+        errors: int = 0
+    ):
+        """Record account scoring specific metrics."""
+        self.record_histogram("account_scoring_duration_seconds", duration_seconds)
+        self.increment_counter("account_scoring_accounts_total", accounts_scored)
+        if errors > 0:
+            self.increment_counter("account_scoring_errors_total", errors)
+    
+    def record_api_metrics(
+        self,
+        service: str,
+        status_code: int,
+        duration_seconds: float
+    ):
+        """Record API call metrics."""
+        labels = {"service": service, "status_code": str(status_code)}
+        self.record_histogram("api_call_duration_seconds", duration_seconds, labels)
+        self.increment_counter("api_call_total", 1.0, labels)
+        if status_code >= 400:
+            self.increment_counter("api_call_errors_total", 1.0, labels)
+    
+    def record_bigquery_metrics(
+        self,
+        query_type: str,
+        duration_seconds: float,
+        rows_returned: int = 0
+    ):
+        """Record BigQuery query metrics."""
+        labels = {"query_type": query_type}
+        self.record_histogram("bigquery_query_duration_seconds", duration_seconds, labels)
+        if rows_returned > 0:
+            self.increment_counter("bigquery_rows_returned_total", rows_returned, labels)
+    
+    def record_vertex_ai_metrics(
+        self,
+        model_name: str,
+        tokens_used: int,
+        duration_seconds: float
+    ):
+        """Record Vertex AI usage metrics."""
+        labels = {"model": model_name}
+        self.increment_counter("vertex_ai_token_usage_total", tokens_used, labels)
+        self.record_histogram("vertex_ai_request_duration_seconds", duration_seconds, labels)
 
 
 class PerformanceMonitor:

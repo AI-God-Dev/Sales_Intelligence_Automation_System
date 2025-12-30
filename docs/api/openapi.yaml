@@ -1,0 +1,138 @@
+openapi: 3.0.0
+info:
+  title: Sales Intelligence Automation System API
+  version: 1.0.0
+  description: |
+    API for sales intelligence automation system providing account scoring,
+    semantic search, NLP queries, and automation features.
+  contact:
+    name: API Support
+    email: support@example.com
+
+servers:
+  - url: https://{region}-{project_id}.cloudfunctions.net
+    description: Production Cloud Functions
+    variables:
+      region:
+        default: us-central1
+      project_id:
+        default: maharani-sales-hub-11-2025
+
+paths:
+  /account-scoring:
+    post:
+      summary: Score accounts using AI
+      description: |
+        Scores accounts based on email, call, and activity data using Vertex AI Gemini.
+        Returns priority scores, budget likelihood, engagement scores, and recommendations.
+      operationId: scoreAccounts
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                  description: Limit number of accounts to score (for testing)
+                  example: 5
+              example:
+                limit: 5
+      responses:
+        '200':
+          description: Scoring completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  accounts_scored:
+                    type: integer
+                    example: 5
+                  completed_at:
+                    type: string
+                    format: date-time
+                    example: "2025-12-27T08:15:30Z"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /generate-embeddings:
+    post:
+      summary: Generate embeddings for semantic search
+      description: Generates vector embeddings for emails, calls, and other content
+      operationId: generateEmbeddings
+      responses:
+        '200':
+          description: Embeddings generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: success
+                  embeddings_generated:
+                    type: integer
+                    example: 100
+  
+  /nlp-query:
+    post:
+      summary: Execute natural language query
+      description: Converts natural language to SQL and executes against BigQuery
+      operationId: nlpQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: Natural language query
+                  example: "Show me accounts with budget discussions in the last 30 days"
+      responses:
+        '200':
+          description: Query executed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sql:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      type: object
+                  summary:
+                    type: string
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        error_type:
+          type: string
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        context:
+          type: object
+

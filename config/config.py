@@ -30,6 +30,39 @@ class Settings(BaseSettings):
         super().__init__(**kwargs)
         self._secret_client = None
     
+    def validate_secret(self, secret_value: str, secret_name: str) -> str:
+        """
+        Validate secret format and content.
+        
+        Args:
+            secret_value: Secret value to validate
+            secret_name: Name of the secret (for error messages)
+            
+        Returns:
+            Validated and sanitized secret value
+            
+        Raises:
+            ValueError: If secret is invalid
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if not secret_value or secret_value.strip() == "":
+            raise ValueError(f"Secret {secret_name} is empty")
+        
+        # Check for placeholder values
+        placeholder_values = ["PLACEHOLDER", "CHANGEME", "TODO", "REPLACE", "YOUR_", "example"]
+        secret_upper = secret_value.upper()
+        for placeholder in placeholder_values:
+            if placeholder in secret_upper:
+                raise ValueError(f"Secret {secret_name} contains placeholder value: {placeholder}")
+        
+        # Minimum length check (except for optional secrets)
+        if len(secret_value.strip()) < 8 and secret_name not in ["salesforce-refresh-token", "salesforce-instance-url"]:
+            raise ValueError(f"Secret {secret_name} is too short (minimum 8 characters)")
+        
+        return secret_value.strip()
+    
     def get_secret(self, secret_id: str, version: str = "latest") -> str:
         """
         Retrieve secret from Google Secret Manager.
@@ -45,9 +78,15 @@ class Settings(BaseSettings):
             Exception: If secret retrieval fails
         """
         import logging
+        from utils.input_validation import validate_secret_name
+        
         logger = logging.getLogger(__name__)
         
         try:
+            # Validate secret name format
+            if not validate_secret_name(secret_id):
+                raise ValueError(f"Invalid secret name format: {secret_id}")
+            
             # Ensure project ID is clean (remove any whitespace or extra content)
             project_id = str(self.gcp_project_id).strip()
             if not project_id or " " in project_id:
@@ -66,7 +105,11 @@ class Settings(BaseSettings):
             response = self._secret_client.access_secret_version(request={"name": name})
             # Strip whitespace and newlines from secret value
             secret_value = response.payload.data.decode("UTF-8").strip()
-            return secret_value
+            
+            # Validate secret content
+            validated_secret = self.validate_secret(secret_value, secret_id)
+            
+            return validated_secret
         except Exception as e:
             error_msg = f"Failed to retrieve secret '{secret_id}' from Secret Manager: {str(e)}"
             logger.error(error_msg)
