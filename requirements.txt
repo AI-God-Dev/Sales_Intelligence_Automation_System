@@ -47,7 +47,7 @@ pytest-cov==4.1.0
 pytest-mock==3.12.0
 
 # Logging & Monitoring
-google-cloud-logging==3.8.0
+google-cloud-logging==3.13.0
 google-cloud-monitoring==2.16.0
 google-cloud-pubsub==2.21.5
 
