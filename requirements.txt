@@ -38,7 +38,7 @@ streamlit-authenticator==0.2.3
 # Utilities
 python-dotenv==1.0.0
 pydantic==2.5.2
-pydantic-settings==2.1.0
+pydantic-settings==2.12.0
 tenacity==8.2.3
 
 # Testing
