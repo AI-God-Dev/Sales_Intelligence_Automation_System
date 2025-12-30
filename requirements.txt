@@ -32,7 +32,7 @@ setuptools<81  # Avoid pkg_resources deprecation warnings
 sentence-transformers==5.2.0
 
 # Web Framework (for Streamlit option)
-streamlit==1.28.2
+streamlit==1.52.2
 streamlit-authenticator==0.2.3
 
 # Utilities
