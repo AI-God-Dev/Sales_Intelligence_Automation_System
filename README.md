@@ -168,6 +168,14 @@ streamlit run app.py
 | [Operations Runbook](docs/operations/RUNBOOK.md) | Production operations guide |
 | [Web App Guide](docs/user-guides/WEB_APP.md) | Web application usage |
 
+### Role-Based Guides
+
+| Guide | Audience |
+|-------|----------|
+| [Sales Rep Guide](docs/usage/SALES_REP_GUIDE.md) | Daily usage for sales team |
+| [Manager Guide](docs/usage/MANAGER_GUIDE.md) | Visibility and coaching |
+| [Engineering/Ops Guide](docs/usage/ENGINEERING_OPS_GUIDE.md) | Safe system interaction |
+
 ## Development
 
 ```bash
