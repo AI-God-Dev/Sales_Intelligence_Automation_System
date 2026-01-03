@@ -59,12 +59,12 @@ docker-logs: ## View Docker logs
 	docker-compose logs -f
 
 deploy: ## Deploy to GCP
-	chmod +x scripts/deploy_functions.sh
-	./scripts/deploy_functions.sh
+	chmod +x scripts/deploy/deploy_all.sh
+	./scripts/deploy/deploy_all.sh
 
 setup-secrets: ## Setup secrets in Secret Manager
-	chmod +x scripts/setup_secrets.sh
-	./scripts/setup_secrets.sh
+	chmod +x scripts/setup/setup_secrets.sh
+	./scripts/setup/setup_secrets.sh
 
 security-check: ## Run security checks
 	safety check --file requirements.txt

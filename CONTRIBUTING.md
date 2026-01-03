@@ -2,107 +2,195 @@
 
 Thank you for your interest in contributing to the Sales Intelligence & Automation System!
 
-## Development Setup
+## Getting Started
 
-1. **Fork and Clone**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Sales_Intelligence_Automation_System.git
-   cd Sales_Intelligence_Automation_System
-   ```
+### Prerequisites
+- Python 3.11+
+- Google Cloud SDK
+- Git
 
-2. **Create Virtual Environment**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+### Setup
 
-3. **Install Dependencies**
-   ```bash
-   make install-dev
-   ```
+```bash
+# Clone repository
+git clone https://github.com/YOUR_USERNAME/Sales_Intelligence_Automation_System.git
+cd Sales_Intelligence_Automation_System
 
-4. **Setup Pre-commit Hooks**
-   ```bash
-   pre-commit install
-   ```
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-## Code Style
+# Install dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
-- Follow PEP 8 style guide
-- Use Black for code formatting (line length: 100)
-- Use isort for import sorting
-- Type hints are required for all function signatures
-- Docstrings should follow Google style
+# Install pre-commit hooks
+pre-commit install
+```
 
 ## Development Workflow
 
-1. **Create a Branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+### 1. Create a Branch
 
-2. **Make Changes**
-   - Write code following the style guide
-   - Add tests for new functionality
-   - Update documentation as needed
+```bash
+git checkout -b feature/your-feature-name
+```
 
-3. **Run Tests**
-   ```bash
-   make test
-   ```
+Branch naming conventions:
+- `feature/` - New features
+- `fix/` - Bug fixes
+- `docs/` - Documentation updates
+- `refactor/` - Code refactoring
 
-4. **Run Linters**
-   ```bash
-   make lint
-   ```
+### 2. Make Changes
 
-5. **Format Code**
-   ```bash
-   make format
-   ```
+Follow these guidelines:
+- Write clean, readable code
+- Add type hints to all functions
+- Write docstrings (Google style)
+- Add tests for new functionality
+- Update documentation as needed
 
-6. **Commit Changes**
-   ```bash
-   git commit -m "feat: add new feature"
-   ```
-   
-   Use conventional commits:
-   - `feat:` New feature
-   - `fix:` Bug fix
-   - `docs:` Documentation changes
-   - `style:` Code style changes
-   - `refactor:` Code refactoring
-   - `test:` Test additions/changes
-   - `chore:` Maintenance tasks
+### 3. Run Quality Checks
 
-7. **Push and Create Pull Request**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
+```bash
+# Run tests
+pytest
+
+# Run linting
+make lint
+
+# Format code
+make format
+```
+
+### 4. Commit Changes
+
+Use conventional commits:
+
+```bash
+git commit -m "feat: add new feature"
+git commit -m "fix: resolve bug in X"
+git commit -m "docs: update README"
+```
+
+Commit types:
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation
+- `style:` - Formatting
+- `refactor:` - Code refactoring
+- `test:` - Adding tests
+- `chore:` - Maintenance
+
+### 5. Create Pull Request
+
+```bash
+git push origin feature/your-feature-name
+```
+
+Then create a PR on GitHub.
+
+## Code Style
+
+### Python
+- Follow PEP 8
+- Use Black for formatting (line length: 100)
+- Use isort for imports
+- Type hints required
+
+### Example
+
+```python
+def process_account(
+    account_id: str,
+    options: dict[str, Any] | None = None
+) -> AccountResult:
+    """Process an account for scoring.
+    
+    Args:
+        account_id: The Salesforce account ID.
+        options: Optional processing options.
+        
+    Returns:
+        AccountResult with score and recommendations.
+        
+    Raises:
+        ValueError: If account_id is invalid.
+    """
+    if not validate_account_id(account_id):
+        raise ValueError(f"Invalid account ID: {account_id}")
+    
+    # Implementation...
+```
 
 ## Testing
 
-- Write unit tests for all new functions
-- Aim for >80% code coverage
-- Run tests before committing: `make test`
-- Integration tests should be in `tests/integration/`
+### Requirements
+- Write tests for all new functionality
+- Maintain 80%+ coverage
+- Use pytest fixtures
 
-## Pull Request Process
+### Running Tests
 
-1. Update README.md if needed
-2. Update CHANGELOG.md with your changes
-3. Ensure all tests pass
-4. Ensure code coverage doesn't decrease
-5. Request review from maintainers
+```bash
+# All tests
+pytest
 
-## Code Review Guidelines
+# With coverage
+pytest --cov=.
 
-- Be respectful and constructive
-- Focus on code quality and maintainability
-- Ask questions if something is unclear
-- Approve when ready, request changes if needed
+# Specific file
+pytest tests/test_file.py
 
-## Questions?
+# Specific test
+pytest tests/test_file.py::test_function
+```
 
-Open an issue or contact the maintainers.
+### Test Structure
 
+```
+tests/
+├── unit/           # Unit tests
+├── integration/    # Integration tests
+├── e2e/            # End-to-end tests
+└── fixtures/       # Test data
+```
+
+## Documentation
+
+### When to Update
+- Adding new features
+- Changing existing behavior
+- Adding new configuration options
+- Modifying API endpoints
+
+### Documentation Structure
+
+```
+docs/
+├── setup/          # Setup and configuration
+├── architecture/   # System design
+├── operations/     # Runbooks
+└── user-guides/    # End-user docs
+```
+
+## Pull Request Checklist
+
+- [ ] Code follows style guidelines
+- [ ] Tests pass locally
+- [ ] New tests added for new functionality
+- [ ] Documentation updated
+- [ ] CHANGELOG.md updated
+- [ ] No secrets or credentials committed
+- [ ] Branch is up to date with main
+
+## Getting Help
+
+- Open an issue for bugs or questions
+- Check existing issues before creating new ones
+- Use discussions for general questions
+
+## Code of Conduct
+
+Be respectful, constructive, and collaborative. We're all here to build great software.

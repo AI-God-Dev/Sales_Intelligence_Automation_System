@@ -1,267 +1,201 @@
 # Sales Intelligence & Automation System
 
-AI-driven sales intelligence and outreach system that unifies communication data and automates sales workflows across Salesforce, Gmail, Dialpad, and HubSpot.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![GCP](https://img.shields.io/badge/cloud-Google%20Cloud-4285F4.svg)](https://cloud.google.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **📖 New to this project?** Start with **[README_DEPLOYMENT.md](README_DEPLOYMENT.md)** for complete deployment instructions, or use **[DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)** for a fast-track deployment.
+AI-driven sales intelligence platform that unifies communication data and automates sales workflows across Salesforce, Gmail, Dialpad, and HubSpot.
 
-> **🏗️ Architecture & AI System:** See **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** for system design and **[AI_SYSTEM_GUIDE.md](AI_SYSTEM_GUIDE.md)** for AI capabilities.
+## Overview
 
-> **🧪 Testing & Operations:** See **[LOCAL_TESTING_GUIDE.md](LOCAL_TESTING_GUIDE.md)** for local development and **[RUNBOOK_OPERATIONS.md](RUNBOOK_OPERATIONS.md)** for production operations.
+This system consolidates all customer interactions (emails, calls, CRM activities) into a unified BigQuery data warehouse, providing AI-powered insights for sales prioritization and automation.
 
-## Project Overview
+### Key Features
 
-This system consolidates all customer interactions (emails, calls, CRM activities) in BigQuery and provides a unified data warehouse for sales intelligence and automation.
-
-### Phase 1: Data Foundation ✅ (Completed - Production Ready)
-- Multi-source data ingestion (Gmail, Salesforce, Dialpad, HubSpot)
-- Unified BigQuery data warehouse
-- Entity resolution (email & phone matching)
-- Automated sync scheduling
-- Comprehensive monitoring and error handling
-
-### Phase 2: Intelligence & Automation ✅ (Completed - Production Ready)
-- **Unified AI Abstraction Layer** (`ai/` directory) - Provider-agnostic LLM and embedding interfaces
-- **MOCK_MODE & LOCAL_MODE** - Full offline testing capabilities
-- Daily AI-powered account scoring and prioritization
-- Automated lead creation from unmatched emails
-- AI-generated email replies
-- HubSpot sequence enrollment
-- Natural language query interface
-- Semantic search across all communications
-- BigQuery Vector Search implementation
+- **Unified Data Warehouse** - Consolidate Gmail, Salesforce, Dialpad, and HubSpot data
+- **AI Account Scoring** - Daily prioritization using Vertex AI (Gemini)
+- **Natural Language Queries** - Ask questions about your data in plain English
+- **Semantic Search** - Find communications by intent, not just keywords
+- **Automated Lead Creation** - Convert unmatched emails to Salesforce leads
+- **HubSpot Integration** - Automatic sequence enrollment
 
 ## Architecture
 
 ```
-[Gmail API]──┐
-[Salesforce API]──┼──► Cloud Functions → BigQuery
-[Dialpad API]──┤
-[HubSpot API]──┘
-        │
-        ▼
- ┌─────────────────────────────────────────────┐
- │              BigQuery Warehouse             │
- └─────────────────────────────────────────────┘
-        │
-        ▼
- [Vector Search + LLM (Vertex AI)]
-        │
-        ▼
- [Web App – Query + Lead Dashboard + Actions]
+┌─────────────────────────────────────────────────────────────┐
+│                    Data Sources                              │
+├──────────┬──────────┬──────────┬──────────────────────────────┤
+│  Gmail   │Salesforce│ Dialpad  │         HubSpot            │
+└────┬─────┴────┬─────┴────┬─────┴────────────┬───────────────┘
+     │          │          │                  │
+     ▼          ▼          ▼                  ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Cloud Functions (ETL)                          │
+│   gmail-sync │ salesforce-sync │ dialpad-sync │ hubspot-sync│
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 BigQuery Data Warehouse                     │
+│  └─ sales_intelligence dataset (16 tables)                 │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ Account      │ │ NLP Query    │ │ Vector       │
+│ Scoring      │ │ Generator    │ │ Search       │
+└──────────────┘ └──────────────┘ └──────────────┘
+          │              │              │
+          └──────────────┼──────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Streamlit Web Application                      │
+│     Dashboard │ Search │ Queries │ Account Details         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Technology Stack
+## Quick Start
 
-- **Data Warehouse**: Google BigQuery
-- **ETL/Ingestion**: Google Cloud Functions + Cloud Scheduler (Python 3.11)
-- **LLM Provider**: Google Vertex AI (Gemini models)
-- **Embeddings**: Vertex AI textembedding-gecko@001
-- **Vector Search**: BigQuery Vector Search
-- **Web Application**: Streamlit or Next.js
-- **Hosting**: Google Cloud Run
-- **Authentication**: Google Workspace OAuth
+### Prerequisites
+
+- Google Cloud Platform project with billing enabled
+- Python 3.11+
+- `gcloud` CLI installed and configured
+- API credentials for: Salesforce, Gmail, Dialpad, HubSpot
+
+### 1. Clone and Setup
+
+```bash
+git clone <repository-url>
+cd Sales_Intelligence_Automation_System
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 2. Configure Environment
+
+```bash
+# Set required environment variables
+export GCP_PROJECT_ID="your-project-id"
+export GCP_REGION="us-central1"
+
+# Authenticate with GCP
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project $GCP_PROJECT_ID
+```
+
+### 3. Deploy Infrastructure
+
+```bash
+# Enable required APIs
+./scripts/setup/enable_apis.ps1
+
+# Create BigQuery dataset
+./scripts/setup/create_bigquery.ps1
+
+# Deploy Cloud Functions
+./scripts/deploy/deploy_all.ps1
+```
+
+### 4. Run Web Application
+
+```bash
+cd web_app
+streamlit run app.py
+```
+
+📖 **Detailed setup guide:** [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md)
 
 ## Project Structure
 
 ```
-.
-├── cloud_functions/          # GCP Cloud Functions for data ingestion
+├── ai/                    # AI abstraction layer (LLM, embeddings)
+├── cloud_functions/       # GCP Cloud Functions for data ingestion
 │   ├── gmail_sync/
 │   ├── salesforce_sync/
 │   ├── dialpad_sync/
-│   ├── hubspot_sync/
-│   └── entity_resolution/
-├── bigquery/                 # Schema definitions and SQL scripts
-│   ├── schemas/
-│   └── queries/
-├── intelligence/             # AI/LLM integration code
-│   ├── scoring/
-│   ├── embeddings/
-│   └── nlp_query/
-├── web_app/                  # Web application (Streamlit/Next.js)
-├── infrastructure/           # Terraform/IaC configurations
-├── tests/                    # Unit and integration tests
-├── docs/                     # Documentation
-└── scripts/                  # Utility scripts
+│   └── hubspot_sync/
+├── config/                # Configuration management
+├── docs/                  # Documentation
+│   ├── setup/             # Setup and deployment guides
+│   ├── architecture/      # Technical architecture
+│   ├── operations/        # Runbooks and troubleshooting
+│   └── user-guides/       # End-user documentation
+├── infrastructure/        # Terraform IaC
+├── intelligence/          # AI features (scoring, NLP, search)
+├── integrations/          # External API clients
+├── scripts/               # Automation scripts
+│   ├── setup/             # Initial setup
+│   ├── deploy/            # Deployment
+│   └── maintenance/       # Operations
+├── tests/                 # Test suite
+├── utils/                 # Shared utilities
+└── web_app/               # Streamlit web application
 ```
 
-## 🚀 Quick Start
+## Configuration
 
-### Fast Deployment (4 Steps)
+### Required Environment Variables
 
-1. **Set Environment Variables** - Configure your GCP project ID and region
-2. **Setup Service Account** - Run `.\scripts\setup_service_account.ps1`
-3. **Create BigQuery Dataset** - Run `.\scripts\create_bigquery_datasets.ps1`
-4. **Deploy All Functions** - Run `.\scripts\deploy_all.ps1`
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GCP_PROJECT_ID` | Google Cloud project ID | Yes |
+| `GCP_REGION` | GCP region (default: us-central1) | No |
+| `DATASET_ID` | BigQuery dataset name | No |
+| `LLM_MODEL` | Vertex AI model (default: gemini-2.5-pro) | No |
 
-**📖 Detailed Instructions:** See [README_DEPLOYMENT.md](README_DEPLOYMENT.md) for complete step-by-step guide.
+### Required Secrets (Secret Manager)
 
-**⚡ Quick Reference:** See [DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md) for fast-track deployment.
+- `salesforce-client-id`
+- `salesforce-client-secret`
+- `dialpad-api-key`
+- `hubspot-api-key`
 
-## 📊 Project Status
-
-### Phase 1: Foundation & Data Pipeline ✅ **COMPLETE**
-
-**Status:** ✅ Production Ready | **Tests:** 45/45 passing (100%) | **Coverage:** 30% overall
-
-**Completed Components:**
-- [x] Project structure setup
-- [x] BigQuery schema creation (13 tables with sync state tracking)
-- [x] Gmail ingestion (with domain-wide delegation)
-- [x] Salesforce sync (all objects: Account, Contact, Lead, Opportunity, Activity)
-- [x] Dialpad sync (calls + transcripts)
-- [x] HubSpot sync (sequences metadata)
-- [x] Entity resolution (email & phone matching)
-- [x] Pub/Sub topics and subscriptions
-- [x] Cloud Scheduler jobs (automated ingestion)
-- [x] Comprehensive error handling and monitoring
-- [x] Automated test suite (45 tests, 100% pass rate)
-- [x] Complete documentation
-
-### Phase 2: Intelligence & Automation ✅ (Completed - Production Ready)
-- ✅ Embeddings generation
-- ✅ Vector search
-- ✅ Daily account scoring
-- ✅ Natural language queries
-- ✅ Lead creation automation
-- ✅ HubSpot enrollment
-- ✅ AI email replies
-
-### Phase 3: Application and UAT ✅ (Completed - Production Ready)
-- ✅ Web application development (Streamlit)
-- ✅ Authentication setup (Google OAuth ready)
-- ✅ Complete dashboard and views
-- ✅ Mobile-responsive design
-
-## Success Criteria
-
-- 95%+ of emails successfully ingested and linked to Salesforce contacts
-- 90%+ of known contacts matched to correct Salesforce accounts
-- Daily account scores delivered by 8 AM each morning
-- Natural language queries return results in under 10 seconds
-- AI-generated email replies are contextually accurate and editable
-- HubSpot sequence enrollments succeed with 98%+ success rate
-
-## Production Readiness
-
-**✅ Production-Ready Features**:
-- Comprehensive input validation and sanitization
-- SQL injection prevention
-- Secure secret management
-- Robust error handling with user-friendly messages
-- Monitoring and observability
-- Complete documentation
-- Unified AI abstraction layer with provider switching
-- MOCK_MODE and LOCAL_MODE for testing
+📖 **Configuration guide:** [docs/setup/CONFIGURATION.md](docs/setup/CONFIGURATION.md)
 
 ## Documentation
 
-### Core Documentation
-- **[README_DEPLOYMENT.md](README_DEPLOYMENT.md)** - Complete deployment guide
-- **[DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)** - Fast-track deployment
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and solutions
-
-### Architecture & Design
-- **[SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md)** - Complete system architecture
-- **[AI_SYSTEM_GUIDE.md](AI_SYSTEM_GUIDE.md)** - AI system usage and configuration
-- **[WEB_APP_GUIDE.md](WEB_APP_GUIDE.md)** - Web application guide
-
-### Operations & Testing
-- **[LOCAL_TESTING_GUIDE.md](LOCAL_TESTING_GUIDE.md)** - Local development and testing
-- **[RUNBOOK_OPERATIONS.md](RUNBOOK_OPERATIONS.md)** - Production operations guide
-- **[NEXT_STEPS.md](NEXT_STEPS.md)** - Development roadmap
-
-### Handoff & Validation
-- **[HANDOFF_DOCUMENT.md](HANDOFF_DOCUMENT.md)** - Complete project handoff document
-- **[FINAL_VALIDATION_CHECKLIST.md](FINAL_VALIDATION_CHECKLIST.md)** - Pre-deployment validation checklist
-- **[PROJECT_COMPLETION_SUMMARY.md](PROJECT_COMPLETION_SUMMARY.md)** - Project completion summary
-
-### Additional Resources
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Detailed architecture documentation
-- **[docs/API.md](docs/API.md)** - API reference
-- **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** - Configuration guide
-
-## Production Requirements
-
-**⚠️ Important**: Before deploying to production, ensure you have:
-
-1. **All Required Credentials**:
-   - GCP project with billing enabled
-   - Salesforce API credentials
-   - Gmail OAuth credentials (for mailboxes)
-   - Dialpad API key
-   - HubSpot API credentials
-   - GCP Project ID (Vertex AI uses Application Default Credentials - no API keys needed)
-
-2. **Infrastructure Setup**:
-   - GCP APIs enabled
-   - Service accounts configured
-   - Secret Manager secrets created
-   - BigQuery dataset created
-
-3. **Access & Permissions**:
-   - Google Workspace admin access
-   - Salesforce admin access
-   - All users authorized for OAuth
-
-See [README_DEPLOYMENT.md](README_DEPLOYMENT.md) for complete deployment instructions.
-
-## 📚 Documentation
-
-| Document | Purpose |
-|----------|---------|
-| **[README_DEPLOYMENT.md](README_DEPLOYMENT.md)** | Complete deployment guide - **Start here!** |
-| **[DEPLOYMENT_QUICK_START.md](DEPLOYMENT_QUICK_START.md)** | Fast-track deployment (4 steps) |
-| **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** | Common issues and solutions |
-| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | System architecture overview |
-| **[docs/API.md](docs/API.md)** | API documentation |
-| **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | Configuration guide |
-
-## 📞 Contact
-
-**Client**: Anand Gohel (anand@maharaniweddings.com)  
-**Company**: MaharaniWeddings.com  
-**Project**: Sales Intelligence & Automation System
+| Document | Description |
+|----------|-------------|
+| [Deployment Guide](docs/setup/DEPLOYMENT.md) | Complete deployment instructions |
+| [Configuration](docs/setup/CONFIGURATION.md) | Environment and secrets setup |
+| [Architecture](docs/architecture/SYSTEM_OVERVIEW.md) | System design and components |
+| [API Reference](docs/architecture/API.md) | Cloud Functions API documentation |
+| [Troubleshooting](docs/operations/TROUBLESHOOTING.md) | Common issues and solutions |
+| [Operations Runbook](docs/operations/RUNBOOK.md) | Production operations guide |
+| [Web App Guide](docs/user-guides/WEB_APP.md) | Web application usage |
 
 ## Development
 
-### Setup
-
 ```bash
-# Install dependencies
-make install-dev
+# Install dev dependencies
+pip install -r requirements-dev.txt
 
 # Run tests
-make test
+pytest
+
+# Run linting
+make lint
 
 # Format code
 make format
-
-# Run linters
-make lint
 ```
 
-### Docker Development
+## Technology Stack
 
-```bash
-# Build and run
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
-```
-
-## CI/CD
-
-The project uses GitHub Actions for continuous integration:
-- Automated testing on push/PR
-- Code quality checks (linting, formatting)
-- Security scanning
-- Docker image building
-- Automated deployment to staging/production
+| Component | Technology |
+|-----------|------------|
+| Data Warehouse | Google BigQuery |
+| ETL | Cloud Functions (Python 3.11) |
+| Scheduling | Cloud Scheduler |
+| AI/LLM | Vertex AI (Gemini 2.5 Pro) |
+| Embeddings | textembedding-gecko@001 |
+| Web App | Streamlit |
+| Infrastructure | Terraform |
+| Secrets | Secret Manager |
 
 ## Contributing
 
@@ -269,5 +203,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
+---
+
+**Client:** MaharaniWeddings.com  
+**Contact:** anand@maharaniweddings.com

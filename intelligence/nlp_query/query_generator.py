@@ -51,7 +51,28 @@ class NLPQueryGenerator:
     
     def _call_llm(self, prompt: str, system_prompt: str = "") -> str:
         """Call LLM with prompt and return response using unified abstraction."""
-        return self.model_provider.generate(prompt, system_prompt=system_prompt, max_tokens=1000)
+        try:
+            return self.model_provider.generate(prompt, system_prompt=system_prompt, max_tokens=1000)
+        except Exception as e:
+            error_str = str(e).lower()
+            # Handle specific Gemini model errors
+            if "404" in error_str or "not found" in error_str or "model" in error_str:
+                logger.error(f"Gemini model error: {e}")
+                raise ValueError(
+                    f"AI model error: The configured model may not be available or accessible. "
+                    f"Please check that LLM_MODEL environment variable is set correctly (e.g., 'gemini-2.5-pro'). "
+                    f"Original error: {str(e)}"
+                ) from e
+            elif "permission" in error_str or "access" in error_str:
+                logger.error(f"Permission error accessing Gemini model: {e}")
+                raise ValueError(
+                    f"Permission error: The service account may not have access to Vertex AI. "
+                    f"Please ensure the service account has 'roles/aiplatform.user' role. "
+                    f"Original error: {str(e)}"
+                ) from e
+            else:
+                # Re-raise other errors
+                raise
     
     def get_schema_context(self) -> str:
         """Get schema information for LLM context."""
@@ -191,15 +212,32 @@ Generate a BigQuery SQL query to answer this question. Return ONLY the SQL query
         """
         try:
             # Generate SQL
-            sql = self.generate_sql(user_query)
-            logger.info(f"Generated SQL: {sql[:200]}...")
+            try:
+                sql = self.generate_sql(user_query)
+                logger.info(f"Generated SQL: {sql[:200]}...")
+            except ValueError as ve:
+                # Handle model errors specifically
+                return {
+                    "error": str(ve),
+                    "error_type": "model_error",
+                    "query": user_query,
+                    "suggestion": (
+                        "The AI model may not be configured correctly. "
+                        "Please check:\n"
+                        "1. LLM_MODEL environment variable is set (e.g., 'gemini-2.5-pro')\n"
+                        "2. Vertex AI API is enabled in your GCP project\n"
+                        "3. Service account has 'roles/aiplatform.user' permission"
+                    )
+                }
             
             # Validate SQL
             is_valid, error = self.validate_sql(sql)
             if not is_valid:
                 return {
                     "error": f"Query validation failed: {error}",
-                    "sql": sql
+                    "error_type": "validation_error",
+                    "sql": sql,
+                    "query": user_query
                 }
             
             # Replace placeholders in SQL
@@ -209,8 +247,12 @@ Generate a BigQuery SQL query to answer this question. Return ONLY the SQL query
             # Execute query
             results = self.bq_client.query(sql, max_results=settings.max_query_results)
             
-            # Generate summary
-            summary = self._generate_summary(user_query, results, sql)
+            # Generate summary (with error handling)
+            try:
+                summary = self._generate_summary(user_query, results, sql)
+            except Exception as summary_error:
+                logger.warning(f"Failed to generate summary: {summary_error}")
+                summary = f"Query returned {len(results)} results."
             
             return {
                 "query": user_query,
@@ -222,9 +264,30 @@ Generate a BigQuery SQL query to answer this question. Return ONLY the SQL query
             
         except Exception as e:
             logger.error(f"Error executing query: {e}", exc_info=True)
+            error_str = str(e).lower()
+            
+            # Provide helpful error messages
+            if "404" in error_str or "not found" in error_str:
+                error_type = "model_not_found"
+                suggestion = (
+                    "The AI model specified in LLM_MODEL environment variable was not found. "
+                    "Please ensure you're using a valid model name like 'gemini-2.5-pro' or 'gemini-1.5-flash'."
+                )
+            elif "permission" in error_str or "access" in error_str:
+                error_type = "permission_error"
+                suggestion = (
+                    "Permission denied accessing Vertex AI. "
+                    "Please ensure the service account has 'roles/aiplatform.user' role."
+                )
+            else:
+                error_type = "unknown_error"
+                suggestion = "Please check the logs for more details or contact support."
+            
             return {
                 "error": str(e),
-                "query": user_query
+                "error_type": error_type,
+                "query": user_query,
+                "suggestion": suggestion
             }
     
     def _generate_summary(self, query: str, results: list, sql: str) -> str:

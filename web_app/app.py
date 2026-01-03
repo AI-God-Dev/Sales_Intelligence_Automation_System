@@ -400,9 +400,16 @@ st.set_page_config(
 # Inject CSS on page load
 inject_custom_css()
 
-# Configuration
-PROJECT_ID = os.getenv("GCP_PROJECT_ID", "maharani-sales-hub-11-2025")
+# Configuration - Use environment variables, fail if not set for production
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 REGION = os.getenv("GCP_REGION", "us-central1")
+DATASET_ID = os.getenv("DATASET_ID", os.getenv("BQ_DATASET_NAME", "sales_intelligence"))
+
+if not PROJECT_ID:
+    raise ValueError(
+        "GCP_PROJECT_ID environment variable is required. "
+        "Please set it before running the application."
+    )
 # Note: For local dev, use your Google account (gcloud auth login) - you have run.invoker permission
 # For production, web-app-runtime-sa automatically has run.invoker permission
 # No service account impersonation needed - use Application Default Credentials directly
@@ -843,12 +850,24 @@ def call_function(function_name: str, data: Dict = None, method: str = "POST") -
             "error_type": "unknown"
         }
 
-def query_bigquery(query: str, max_results: int = 100) -> List[Dict]:
-    """Query BigQuery directly with improved error handling."""
+def query_bigquery(query: str, max_results: int = 100, job_config=None) -> List[Dict]:
+    """Query BigQuery directly with improved error handling and input validation."""
     if not st.session_state.bq_client:
         return []
+    
+    # Validate inputs
+    if not query or not isinstance(query, str):
+        import logging
+        logging.getLogger(__name__).warning("Invalid query: must be a non-empty string")
+        return []
+    
+    if max_results and (not isinstance(max_results, int) or max_results <= 0 or max_results > 10000):
+        import logging
+        logging.getLogger(__name__).warning(f"Invalid max_results: {max_results}, using default 100")
+        max_results = 100
+    
     try:
-        return st.session_state.bq_client.query(query, max_results=max_results)
+        return st.session_state.bq_client.query(query, max_results=max_results, job_config=job_config)
     except Exception as e:
         # Handle table not found errors gracefully
         error_str = str(e).lower()
@@ -947,7 +966,7 @@ if page == "Dashboard":
         try:
             total_accounts_query = f"""
             SELECT COUNT(DISTINCT account_id) as count
-            FROM `{PROJECT_ID}.sales_intelligence.sf_accounts`
+            FROM `{PROJECT_ID}.{DATASET_ID}.sf_accounts`
             """
             total_accounts = query_bigquery(total_accounts_query)
             total_accounts_count = total_accounts[0]['count'] if total_accounts else 0
@@ -956,7 +975,7 @@ if page == "Dashboard":
             try:
                 high_priority_query = f"""
                 SELECT COUNT(DISTINCT account_id) as count
-                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
                 WHERE score_date = CURRENT_DATE()
                 AND priority_score >= 70
                 """
@@ -967,11 +986,11 @@ if page == "Dashboard":
             
             unmatched_query = f"""
             SELECT COUNT(DISTINCT p.participant_id) as count
-            FROM `{PROJECT_ID}.sales_intelligence.gmail_participants` p
+            FROM `{PROJECT_ID}.{DATASET_ID}.gmail_participants` p
             WHERE p.sf_contact_id IS NULL
             AND p.role = 'from'
             AND EXISTS (
-                SELECT 1 FROM `{PROJECT_ID}.sales_intelligence.gmail_messages` m
+                SELECT 1 FROM `{PROJECT_ID}.{DATASET_ID}.gmail_messages` m
                 WHERE m.message_id = p.message_id
                 AND m.sent_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 90 DAY)
             )
@@ -981,7 +1000,7 @@ if page == "Dashboard":
             
             opportunities_query = f"""
             SELECT COUNT(DISTINCT opportunity_id) as count
-            FROM `{PROJECT_ID}.sales_intelligence.sf_opportunities`
+            FROM `{PROJECT_ID}.{DATASET_ID}.sf_opportunities`
             WHERE is_closed = FALSE
             """
             opportunities = query_bigquery(opportunities_query)
@@ -1207,12 +1226,12 @@ gcloud functions deploy account-scoring `
                     r.engagement_score,
                     r.recommended_action,
                     r.last_interaction_date
-                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations` r
-                JOIN `{PROJECT_ID}.sales_intelligence.sf_accounts` a
+                FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations` r
+                JOIN `{PROJECT_ID}.{DATASET_ID}.sf_accounts` a
                     ON r.account_id = a.account_id
                 WHERE r.score_date = (
                     SELECT MAX(score_date) 
-                    FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                    FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
                 )
                 ORDER BY r.priority_score DESC
                 LIMIT 20
@@ -1318,10 +1337,10 @@ gcloud functions deploy account-scoring `
                         ELSE 'Low (0-59)'
                     END as score_range,
                     COUNT(*) as count
-                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
                 WHERE score_date = (
                     SELECT MAX(score_date) 
-                    FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                    FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
                 )
                 GROUP BY score_range
                 ORDER BY score_range
@@ -1352,10 +1371,10 @@ gcloud functions deploy account-scoring `
                         ELSE 'Low (0-49)'
                     END as likelihood_range,
                     COUNT(*) as count
-                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
                 WHERE score_date = (
                     SELECT MAX(score_date) 
-                    FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                    FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
                 )
                 GROUP BY likelihood_range
                 ORDER BY likelihood_range
@@ -1395,7 +1414,7 @@ gcloud functions deploy account-scoring `
                 ON r.account_id = a.account_id
             WHERE r.score_date = (
                 SELECT MAX(score_date) 
-                FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
+                FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
             )
             ORDER BY r.priority_score DESC
             LIMIT 100
@@ -1566,8 +1585,8 @@ elif page == "Unmatched Emails":
                     m.mailbox_email,
                     m.from_email,
                     LEFT(m.body_text, 200) as body_preview
-                FROM `{PROJECT_ID}.sales_intelligence.gmail_participants` p
-                JOIN `{PROJECT_ID}.sales_intelligence.gmail_messages` m
+                FROM `{PROJECT_ID}.{DATASET_ID}.gmail_participants` p
+                JOIN `{PROJECT_ID}.{DATASET_ID}.gmail_messages` m
                     ON p.message_id = m.message_id
                 WHERE p.sf_contact_id IS NULL
                     AND p.role = 'from'
@@ -1630,29 +1649,25 @@ elif page == "Account Details":
     if account_search:
         if st.session_state.bq_client:
             try:
-                # Get account details
-                account_query = f"""
-                SELECT *
-                FROM `{PROJECT_ID}.sales_intelligence.sf_accounts`
-                WHERE account_id = @account_id OR account_name LIKE @account_name
-                LIMIT 1
-                """
                 # Use parameterized query to prevent SQL injection
-                # Escape single quotes in search term
-                safe_search = account_search.replace("'", "''")
+                from google.cloud import bigquery
                 account_query = f"""
                 SELECT *
-                FROM `{PROJECT_ID}.sales_intelligence.sf_accounts`
-                WHERE account_id = '{safe_search}' OR account_name LIKE '%{safe_search}%'
+                FROM `{PROJECT_ID}.{DATASET_ID}.sf_accounts`
+                WHERE account_id = @account_id OR account_name LIKE @account_name_pattern
                 LIMIT 1
                 """
-                accounts = query_bigquery(account_query)
+                job_config = bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("account_id", "STRING", account_search),
+                        bigquery.ScalarQueryParameter("account_name_pattern", "STRING", f"%{account_search}%")
+                    ]
+                )
+                accounts = st.session_state.bq_client.query(account_query, job_config=job_config, max_results=1)
                 
                 if accounts:
                     account = accounts[0]
                     account_id = account['account_id']
-                    # Escape account_id to prevent SQL injection (define once for all tabs)
-                    safe_account_id = account_id.replace("'", "''")
                     
                     st.subheader(f"Account: {account.get('account_name', 'Unknown')}")
                     
@@ -1670,15 +1685,20 @@ elif page == "Account Details":
                             for key, value in account.items():
                                 st.write(f"**{key}:** {value}")
                         
-                        # Get latest score
+                        # Get latest score using parameterized query
                         score_query = f"""
                         SELECT *
-                        FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
-                        WHERE account_id = '{safe_account_id}'
+                        FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
+                        WHERE account_id = @account_id
                         ORDER BY score_date DESC
                         LIMIT 1
                         """
-                        scores = query_bigquery(score_query)
+                        score_job_config = bigquery.QueryJobConfig(
+                            query_parameters=[
+                                bigquery.ScalarQueryParameter("account_id", "STRING", account_id)
+                            ]
+                        )
+                        scores = st.session_state.bq_client.query(score_query, job_config=score_job_config, max_results=1)
                         if scores:
                             st.subheader("Latest Account Score")
                             try:
@@ -1696,14 +1716,19 @@ elif page == "Account Details":
                             m.from_email,
                             m.sent_at,
                             LEFT(m.body_text, 300) as body_preview
-                        FROM `{PROJECT_ID}.sales_intelligence.gmail_messages` m
-                        JOIN `{PROJECT_ID}.sales_intelligence.gmail_participants` p
+                        FROM `{PROJECT_ID}.{DATASET_ID}.gmail_messages` m
+                        JOIN `{PROJECT_ID}.{DATASET_ID}.gmail_participants` p
                             ON m.message_id = p.message_id
-                        WHERE p.sf_account_id = '{safe_account_id}'
+                        WHERE p.sf_account_id = @account_id
                         ORDER BY m.sent_at DESC
                         LIMIT 20
                         """
-                        emails = query_bigquery(email_query)
+                        email_job_config = bigquery.QueryJobConfig(
+                            query_parameters=[
+                                bigquery.ScalarQueryParameter("account_id", "STRING", account_id)
+                            ]
+                        )
+                        emails = st.session_state.bq_client.query(email_query, job_config=email_job_config, max_results=20)
                         if emails:
                             st.dataframe(pd.DataFrame(emails), use_container_width=True)
                         else:
@@ -1718,12 +1743,17 @@ elif page == "Account Details":
                             duration_seconds,
                             call_time,
                             sentiment_score
-                        FROM `{PROJECT_ID}.sales_intelligence.dialpad_calls`
-                        WHERE matched_account_id = '{safe_account_id}'
+                        FROM `{PROJECT_ID}.{DATASET_ID}.dialpad_calls`
+                        WHERE matched_account_id = @account_id
                         ORDER BY call_time DESC
                         LIMIT 20
                         """
-                        calls = query_bigquery(call_query)
+                        call_job_config = bigquery.QueryJobConfig(
+                            query_parameters=[
+                                bigquery.ScalarQueryParameter("account_id", "STRING", account_id)
+                            ]
+                        )
+                        calls = st.session_state.bq_client.query(call_query, job_config=call_job_config, max_results=20)
                         if calls:
                             st.dataframe(pd.DataFrame(calls), use_container_width=True)
                         else:
@@ -1732,11 +1762,16 @@ elif page == "Account Details":
                     with tab4:
                         opp_query = f"""
                         SELECT *
-                        FROM `{PROJECT_ID}.sales_intelligence.sf_opportunities`
-                        WHERE account_id = '{safe_account_id}'
+                        FROM `{PROJECT_ID}.{DATASET_ID}.sf_opportunities`
+                        WHERE account_id = @account_id
                         ORDER BY created_date DESC
                         """
-                        opps = query_bigquery(opp_query)
+                        opp_job_config = bigquery.QueryJobConfig(
+                            query_parameters=[
+                                bigquery.ScalarQueryParameter("account_id", "STRING", account_id)
+                            ]
+                        )
+                        opps = st.session_state.bq_client.query(opp_query, job_config=opp_job_config)
                         if opps:
                             st.dataframe(pd.DataFrame(opps), use_container_width=True)
                         else:
@@ -1745,12 +1780,17 @@ elif page == "Account Details":
                     with tab5:
                         all_scores_query = f"""
                         SELECT *
-                        FROM `{PROJECT_ID}.sales_intelligence.account_recommendations`
-                        WHERE account_id = '{safe_account_id}'
+                        FROM `{PROJECT_ID}.{DATASET_ID}.account_recommendations`
+                        WHERE account_id = @account_id
                         ORDER BY score_date DESC
                         LIMIT 30
                         """
-                        all_scores = query_bigquery(all_scores_query)
+                        all_scores_job_config = bigquery.QueryJobConfig(
+                            query_parameters=[
+                                bigquery.ScalarQueryParameter("account_id", "STRING", account_id)
+                            ]
+                        )
+                        all_scores = st.session_state.bq_client.query(all_scores_query, job_config=all_scores_job_config, max_results=30)
                         if all_scores:
                             st.dataframe(pd.DataFrame(all_scores), use_container_width=True)
                         else:
@@ -1772,8 +1812,7 @@ elif page == "Email Threads":
     if thread_search:
         if st.session_state.bq_client:
             try:
-                # Get thread - escape search term to prevent SQL injection
-                safe_thread_search = thread_search.replace("'", "''")
+                # Use parameterized query to prevent SQL injection
                 thread_query = f"""
                 SELECT 
                     message_id,
@@ -1783,11 +1822,16 @@ elif page == "Email Threads":
                     to_emails,
                     sent_at,
                     body_text
-                FROM `{PROJECT_ID}.sales_intelligence.gmail_messages`
-                WHERE thread_id = '{safe_thread_search}' OR from_email = '{safe_thread_search}'
+                FROM `{PROJECT_ID}.{DATASET_ID}.gmail_messages`
+                WHERE thread_id = @search_term OR from_email = @search_term
                 ORDER BY sent_at ASC
                 """
-                thread_emails = query_bigquery(thread_query)
+                thread_job_config = bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("search_term", "STRING", thread_search)
+                    ]
+                )
+                thread_emails = st.session_state.bq_client.query(thread_query, job_config=thread_job_config)
                 
                 if thread_emails:
                     st.subheader(f"Thread: {thread_emails[0].get('subject', 'No subject')}")

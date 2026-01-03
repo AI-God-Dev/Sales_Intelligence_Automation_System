@@ -5,59 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.0.0] - 2025-01-03
 
-### Added - Infrastructure & Deployment (2025-01-XX)
-- Pub/Sub topics for Gmail, Salesforce, Dialpad, and HubSpot ingestion pipelines
-- Dead letter queues (DLQ) for all ingestion topics
-- Cloud Scheduler jobs for automated data ingestion with retry policies
-- Service account configuration for `sales-intel-poc-sa@maharani-sales-hub-11-2025.iam.gserviceaccount.com`
-- Gmail domain-wide delegation (DWD) implementation
-- Gmail sync state table for incremental sync tracking
-- Enhanced entity resolution with fuzzy matching and batch processing
-- Entity resolution Cloud Function
-- Comprehensive error handling with Pub/Sub notifications
-- Performance monitoring utilities with context managers
-- Health check endpoints
-- Automated test suite (unit and integration tests)
-- Documentation for HubSpot OAuth scopes
-- Comprehensive secrets list documentation
-- Deployment summary guide
+### Added
+- **Production Readiness**
+  - SQL injection prevention with parameterized BigQuery queries
+  - Comprehensive input validation across all endpoints
+  - Enhanced error handling for Vertex AI responses
+  - ResponseBlockedError handling for AI safety filters
+
+- **AI Intelligence Layer**
+  - Unified AI abstraction layer (`ai/` directory)
+  - Account scoring with Gemini 2.5 Pro
+  - Natural language to SQL query generation
+  - Semantic search with vector embeddings
+  - AI-generated email replies
+
+- **Web Application**
+  - Full Streamlit dashboard
+  - Account priority visualization
+  - Natural language query interface
+  - Semantic search UI
+  - Unmatched email management
 
 ### Changed
-- Updated Gmail sync to use domain-wide delegation (no OAuth tokens required)
-- Enhanced entity resolution with MERGE statements for efficient BigQuery updates
-- Updated deployment scripts to use service account impersonation
-- Enhanced BigQuery schemas with sync state tracking
-- Improved error messages and logging throughout
-- Better type hints throughout codebase
+- Reorganized documentation structure
+  - `docs/setup/` - Deployment and configuration
+  - `docs/architecture/` - System design
+  - `docs/operations/` - Runbooks and troubleshooting
+  - `docs/user-guides/` - End-user documentation
 
-### Previous Additions
-- Production-ready error handling with retry logic
-- Comprehensive monitoring and observability
-- Docker containerization
-- CI/CD pipeline with GitHub Actions
-- Terraform infrastructure-as-code
-- Caching layer for performance optimization
-- Rate limiting utilities
-- Comprehensive API documentation
-- Security scanning integration
-- Pre-commit hooks for code quality
+- Reorganized scripts structure
+  - `scripts/setup/` - Initial setup scripts
+  - `scripts/deploy/` - Deployment scripts
+  - `scripts/test/` - Testing and validation
+  - `scripts/maintenance/` - Operations scripts
+
+- Updated LLM model to `gemini-2.5-pro`
+- Improved error messages throughout
+
+### Removed
+- Redundant documentation files
+- Obsolete fix summary documents
+- Duplicate application files
+
+### Security
+- Fixed SQL injection vulnerabilities in web app
+- Added input validation for all user inputs
+- Parameterized all BigQuery queries
 
 ## [1.0.0] - 2025-01-XX
 
 ### Added
-- Initial project structure
-- BigQuery schema definitions
-- Gmail sync Cloud Function
-- Salesforce sync Cloud Function
-- Dialpad sync Cloud Function
-- HubSpot sync Cloud Function
-- Entity resolution logic
-- ETL run tracking
-- Basic unit tests
-- Setup and architecture documentation
+- **Data Ingestion Layer**
+  - Gmail sync with Domain-Wide Delegation
+  - Salesforce sync with OAuth 2.0
+  - Dialpad sync with API key auth
+  - HubSpot sync with Private App token
+  - Entity resolution (email/phone matching)
 
-[Unreleased]: https://github.com/AI-God-Dev/Sales_Intelligence_Automation_System/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/AI-God-Dev/Sales_Intelligence_Automation_System/releases/tag/v1.0.0
+- **Data Warehouse**
+  - BigQuery dataset with 16 tables
+  - Partitioned and clustered tables
+  - Vector embedding storage
+  - ETL run tracking
 
+- **Infrastructure**
+  - Cloud Functions (Gen2) deployment
+  - Cloud Scheduler jobs
+  - Secret Manager integration
+  - Terraform IaC
+
+- **Testing**
+  - Unit test suite
+  - Integration tests
+  - Mock mode for offline testing
+
+### Technical Details
+- Python 3.11+ runtime
+- Vertex AI for LLM and embeddings
+- BigQuery for data warehouse
+- Cloud Run for web application
+
+---
+
+For upgrade instructions, see [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md).

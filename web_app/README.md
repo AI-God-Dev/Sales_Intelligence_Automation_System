@@ -1,75 +1,34 @@
 # Sales Intelligence Web Application
 
-Professional Streamlit-based web interface for the Sales Intelligence & Automation System.
+Streamlit-based dashboard for the Sales Intelligence Automation System.
 
 ## Features
 
-### Professional UI/UX
-- ✅ Modern, clean design with professional styling
-- ✅ Custom CSS for enhanced visual appeal
-- ✅ Responsive layout for all screen sizes
-- ✅ Professional color scheme and typography
-- ✅ Enhanced metric cards and visualizations
-- ✅ Improved sidebar with gradient background
+- **Dashboard** - Overview with metrics and priority accounts
+- **Account Scoring** - AI-generated priority scores
+- **Natural Language Query** - Ask questions in plain English
+- **Semantic Search** - Find communications by intent
+- **Account Details** - Complete account information
+- **Email Threads** - View and reply to conversations
 
-### Pages
+## Quick Start
 
-1. **Dashboard** - Real-time metrics and top priority accounts
-2. **Account Scoring** - AI-powered account scoring with charts
-3. **Natural Language Query** - Ask questions in plain English
-4. **Semantic Search** - AI-powered intent-based search
-5. **Unmatched Emails** - Create leads from unmatched emails
-6. **Account Details** - Complete account information view
-7. **Email Threads** - View conversations and generate AI replies
-
-## Styling Improvements
-
-### Custom CSS Injection
-The app includes professional custom CSS for:
-- Enhanced headers and typography
-- Professional metric cards with hover effects
-- Improved button styling with gradients
-- Better info/warning/error boxes
-- Enhanced table styling
-- Professional sidebar with gradient
-- Responsive design elements
-
-### Color Scheme
-- Primary: #1f77b4 (Professional Blue)
-- Secondary: #2c3e50 (Dark Gray)
-- Success: #27ae60 (Green)
-- Warning: #f39c12 (Orange)
-- Error: #e74c3c (Red)
-
-## Running Locally
+### Local Development
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
 # Set environment variables
-export GCP_PROJECT_ID="maharani-sales-hub-11-2025"
-export GCP_REGION="us-central1"
+export GCP_PROJECT_ID="your-project-id"
 
-# Run the application
+# Run application
 streamlit run app.py
 ```
 
-The app will be available at `http://localhost:8501`
+Access at: http://localhost:8501
 
-## Configuration
-
-### Streamlit Config
-Configuration file: `.streamlit/config.toml`
-
-### Environment Variables
-- `GCP_PROJECT_ID` - Google Cloud Project ID
-- `GCP_REGION` - GCP Region
-- `GOOGLE_CLIENT_ID` - Google OAuth Client ID (optional)
-
-## Deployment
-
-### Deploy to Cloud Run
+### Cloud Run Deployment
 
 ```bash
 gcloud run deploy sales-intelligence-web \
@@ -77,56 +36,60 @@ gcloud run deploy sales-intelligence-web \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars GCP_PROJECT_ID=maharani-sales-hub-11-2025,GCP_REGION=us-central1 \
-  --project=maharani-sales-hub-11-2025
+  --set-env-vars="GCP_PROJECT_ID=$GCP_PROJECT_ID"
 ```
 
-## Professional Features
+## Configuration
 
-### Enhanced Metrics
-- Large, readable numbers
-- Color-coded values
-- Professional card styling
-- Hover effects
+### Environment Variables
 
-### Improved Navigation
-- Clean sidebar design
-- Professional branding
-- Clear page navigation
-- Status indicators
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GCP_PROJECT_ID` | GCP project ID | Yes |
+| `GCP_REGION` | GCP region | No |
+| `DATASET_ID` | BigQuery dataset | No |
 
-### Better User Experience
-- Professional loading states
-- Enhanced error messages
-- Improved form inputs
-- Better table presentation
+### Required Permissions
 
-## Screenshots
+The application needs access to:
+- BigQuery (read/query)
+- Cloud Functions (invoke)
 
-### Dashboard
-- Real-time metrics in professional cards
-- Top priority accounts table
-- Refresh functionality
+## Project Structure
 
-### Account Scoring
-- Distribution charts
-- Detailed score breakdowns
-- AI reasoning display
+```
+web_app/
+├── app.py              # Main application
+├── requirements.txt    # Dependencies
+├── Dockerfile          # Container build
+└── styles.css          # Custom styling
+```
 
-### Natural Language Query
-- Plain English input
-- SQL generation preview
-- Results table with summaries
+## Usage Guide
 
-## Browser Support
+See [docs/user-guides/WEB_APP.md](../docs/user-guides/WEB_APP.md) for detailed usage instructions.
 
-- Chrome/Edge (recommended)
-- Firefox
-- Safari
+## Troubleshooting
 
-## Notes
+### BigQuery Connection Failed
 
-- The app uses Streamlit's built-in components with custom CSS enhancements
-- Authentication is currently simple email-based (Google OAuth ready)
-- BigQuery integration requires GCP credentials
-- Cloud Functions integration requires deployed functions
+```bash
+gcloud auth application-default login
+gcloud auth application-default set-quota-project $GCP_PROJECT_ID
+```
+
+### Permission Denied
+
+Ensure your user has:
+- `roles/bigquery.dataViewer`
+- `roles/bigquery.jobUser`
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -r ../requirements-dev.txt
+
+# Run with auto-reload
+streamlit run app.py --server.runOnSave true
+```
