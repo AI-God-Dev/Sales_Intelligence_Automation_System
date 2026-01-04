@@ -6,12 +6,12 @@ google-cloud-secret-manager==2.18.0
 google-cloud-scheduler==2.12.0
 google-auth==2.23.4
 google-auth-oauthlib==1.2.3
-google-auth-httplib2==0.1.1
+google-auth-httplib2==0.3.0
 
 # API Clients
 simple-salesforce==1.12.6
 google-api-python-client==2.187.0
-google-auth-httplib2==0.1.1
+google-auth-httplib2==0.3.0
 google-auth-oauthlib==1.2.3
 hubspot-api-client==12.0.0
 requests==2.31.0
