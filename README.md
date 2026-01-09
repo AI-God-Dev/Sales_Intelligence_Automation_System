@@ -214,6 +214,3 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 MIT License - see [LICENSE](LICENSE) for details.
 
 ---
-
-**Client:** MaharaniWeddings.com  
-**Contact:** anand@maharaniweddings.com
