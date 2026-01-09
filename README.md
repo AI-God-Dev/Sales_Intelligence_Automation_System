@@ -23,8 +23,8 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Data Sources                              │
-├──────────┬──────────┬──────────┬──────────────────────────────┤
+│                    Data Sources                             │
+├──────────┬──────────┬──────────┬────────────────────────────┤
 │  Gmail   │Salesforce│ Dialpad  │         HubSpot            │
 └────┬─────┴────┬─────┴────┬─────┴────────────┬───────────────┘
      │          │          │                  │
@@ -37,7 +37,7 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                 BigQuery Data Warehouse                     │
-│  └─ sales_intelligence dataset (16 tables)                 │
+│  └─ sales_intelligence dataset (16 tables)                  │
 └────────────────────────┬────────────────────────────────────┘
                          │
           ┌──────────────┼──────────────┐
@@ -51,7 +51,7 @@ This system consolidates all customer interactions (emails, calls, CRM activitie
                          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Streamlit Web Application                      │
-│     Dashboard │ Search │ Queries │ Account Details         │
+│     Dashboard │ Search │ Queries │ Account Details          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
