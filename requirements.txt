@@ -33,7 +33,7 @@ sentence-transformers==5.2.0
 
 # Web Framework (for Streamlit option)
 streamlit==1.52.2
-streamlit-authenticator==0.2.3
+streamlit-authenticator==0.4.2
 
 # Utilities
 python-dotenv==1.0.0
